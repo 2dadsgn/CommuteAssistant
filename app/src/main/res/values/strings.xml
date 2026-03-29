@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Commute Assistant</string>
+    <string name="traffic_alert_channel">Traffic Alerts</string>
+    <string name="departure_channel">Departure Reminders</string>
+</resources>
