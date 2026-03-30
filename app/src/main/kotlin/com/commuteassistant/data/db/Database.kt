@@ -36,15 +36,6 @@ data class TrafficSnapshotEntity(
     val congestionLevel: String          // CongestionLevel.name
 )
 
-@Entity(tableName = "saved_places")
-data class SavedPlaceEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
-    val address: String,
-    val lat: Double,
-    val lng: Double
-)
-
 // ─── DAOs ────────────────────────────────────────────────────────────────────
 
 @Dao
@@ -95,27 +86,14 @@ interface TrafficSnapshotDao {
     suspend fun pruneOlderThan(before: Long)
 }
 
-@Dao
-interface SavedPlaceDao {
-    @Query("SELECT * FROM saved_places ORDER BY name ASC")
-    fun observeAll(): Flow<List<SavedPlaceEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(entity: SavedPlaceEntity): Long
-
-    @Delete
-    suspend fun delete(entity: SavedPlaceEntity)
-}
-
 // ─── Database ────────────────────────────────────────────────────────────────
 
 @Database(
-    entities = [CommuteRoutineEntity::class, TrafficSnapshotEntity::class, SavedPlaceEntity::class],
-    version = 3,
+    entities = [CommuteRoutineEntity::class, TrafficSnapshotEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class CommuteDatabase : RoomDatabase() {
     abstract fun routineDao(): CommuteRoutineDao
     abstract fun snapshotDao(): TrafficSnapshotDao
-    abstract fun savedPlaceDao(): SavedPlaceDao
 }

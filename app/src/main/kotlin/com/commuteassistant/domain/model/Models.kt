@@ -54,14 +54,3 @@ data class DepartureRecommendation(
     val reason: String,
     val alternativeTimes: List<LocalTime> = emptyList()
 )
-
-/**
- * A saved recurrent place in the user's address book.
- */
-data class SavedPlace(
-    val id: Long = 0,
-    val name: String,
-    val address: String,
-    val lat: Double,
-    val lng: Double
-)

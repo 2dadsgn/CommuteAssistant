@@ -15,8 +15,7 @@ import javax.inject.Singleton
 @Singleton
 class CommuteRepository @Inject constructor(
     private val routineDao: CommuteRoutineDao,
-    private val snapshotDao: TrafficSnapshotDao,
-    private val savedPlaceDao: SavedPlaceDao
+    private val snapshotDao: TrafficSnapshotDao
 ) {
 
     // ── Routines ──────────────────────────────────────────────────────────────
@@ -54,17 +53,6 @@ class CommuteRepository @Inject constructor(
 
     suspend fun getAverageDuration(routineId: Long): Double? =
         snapshotDao.averageDuration(routineId)
-
-    // ── Saved Places ──────────────────────────────────────────────────────────
-
-    fun observeSavedPlaces(): Flow<List<SavedPlace>> =
-        savedPlaceDao.observeAll().map { list -> list.map { it.toDomain() } }
-
-    suspend fun savePlace(place: SavedPlace): Long =
-        savedPlaceDao.insert(place.toEntity())
-
-    suspend fun deletePlace(place: SavedPlace) =
-        savedPlaceDao.delete(place.toEntity())
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
@@ -120,7 +108,4 @@ class CommuteRepository @Inject constructor(
         normalDurationMinutes = normalDurationMinutes,
         congestionLevel = congestionLevel.name
     )
-
-    private fun SavedPlaceEntity.toDomain() = SavedPlace(id, name, address, lat, lng)
-    private fun SavedPlace.toEntity() = SavedPlaceEntity(id, name, address, lat, lng)
 }

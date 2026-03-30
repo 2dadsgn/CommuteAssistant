@@ -26,7 +26,4 @@ object AppModule {
 
     @Provides
     fun provideSnapshotDao(db: CommuteDatabase): TrafficSnapshotDao = db.snapshotDao()
-
-    @Provides
-    fun provideSavedPlaceDao(db: CommuteDatabase): SavedPlaceDao = db.savedPlaceDao()
 }
