@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,6 +18,7 @@ import com.commuteassistant.notifications.TrafficCheckWorker
 import com.commuteassistant.data.Prediction
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.time.DayOfWeek
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,12 +28,9 @@ fun AddRoutineScreen(
     viewModel: RoutineFormViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val context = LocalContext.current
-
     // Navigate back when saved
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            TrafficCheckWorker.schedule(context)
             onBack()
         }
     }
@@ -42,7 +41,7 @@ fun AddRoutineScreen(
                 title = { Text("Add Commute Route") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -80,16 +79,47 @@ fun AddRoutineScreen(
             )
 
             // ── Day picker ────────────────────────────────────────────────────
-            SectionHeader("Day of Week") //TODO: possibility to pick more than one day
-            DayPicker(selected = state.selectedDay, onSelect = { viewModel.updateDay(it) })
+            SectionHeader("When")
+            DayPicker(selected = state.selectedDay, onSelect = viewModel::updateDay)
+
+            Spacer(Modifier.height(16.dp))
 
             // ── Time picker ───────────────────────────────────────────────────
-            SectionHeader("Usual Departure Time") //TODO: change this to desired arrival time
+            SectionHeader("Desired time of arrival")
             TimePicker(
-                hour = state.departureHour,
-                minute = state.departureMinute,
+                hour = state.departureHour, minute = state.departureMinute,
                 onTimeChange = viewModel::updateTime
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Notification Settings ─────────────────────────────────────────
+            SectionHeader("Notification Settings")
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Enable Notifications", style = MaterialTheme.typography.titleMedium)
+                    Text("Get active traffic updates", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = state.isNotificationEnabled,
+                    onCheckedChange = viewModel::updateNotificationEnabled
+                )
+            }
+
+            if (state.isNotificationEnabled) {
+                Spacer(Modifier.height(8.dp))
+                Text("Send traffic updates every ${state.notificationOffsetMins} minutes", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.Slider(
+                    value = state.notificationOffsetMins.toFloat(),
+                    onValueChange = { viewModel.updateNotificationOffset(it.toInt()) },
+                    valueRange = 15f..60f,
+                    steps = 2
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -162,10 +192,7 @@ fun AutocompleteTextField(
         expanded = suggestions.isNotEmpty()
     }
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = query,
             onValueChange = {
@@ -174,24 +201,26 @@ fun AutocompleteTextField(
             },
             label = { Text(label) },
             leadingIcon = { Icon(leadingIcon, contentDescription = null) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(),
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
-        if (suggestions.isNotEmpty()) {
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
+        
+        androidx.compose.animation.AnimatedVisibility(visible = expanded && suggestions.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
             ) {
-                suggestions.forEach { prediction ->
-                    DropdownMenuItem(
-                        text = { Text(prediction.description) },
-                        onClick = {
-                            onSuggestionSelected(prediction)
-                            expanded = false
-                        }
-                    )
+                Column {
+                    suggestions.forEach { prediction ->
+                        ListItem(
+                            headlineContent = { Text(prediction.description, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                            modifier = Modifier.clickable {
+                                onSuggestionSelected(prediction)
+                                expanded = false
+                            }
+                        )
+                    }
                 }
             }
         }

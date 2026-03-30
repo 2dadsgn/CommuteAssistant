@@ -12,6 +12,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import java.time.DayOfWeek
 import java.time.LocalTime
 import javax.inject.Inject
@@ -19,6 +21,9 @@ import javax.inject.Inject
 data class HomeUiState(
     val routines: List<CommuteRoutine> = emptyList(),
     val recommendations: Map<Long, DepartureRecommendation> = emptyMap(),
+    val savedPlaces: List<SavedPlace> = emptyList(),
+    val searchSuggestions: List<Prediction> = emptyList(),
+    val isSearching: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -26,7 +31,9 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: CommuteRepository,
-    private val recommendationUseCase: GetDepartureRecommendationUseCase
+    private val recommendationUseCase: GetDepartureRecommendationUseCase,
+    private val apiService: GoogleMapsApiService,
+    private val apiKeyProvider: ApiKeyProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -34,6 +41,15 @@ class HomeViewModel @Inject constructor(
 
     init {
         observeRoutines()
+        observeSavedPlaces()
+    }
+
+    private fun observeSavedPlaces() {
+        viewModelScope.launch {
+            repository.observeSavedPlaces()
+                .catch { /* ignore or log */ }
+                .collect { places -> _uiState.update { it.copy(savedPlaces = places) } }
+        }
     }
 
     private fun observeRoutines() {
@@ -59,6 +75,53 @@ class HomeViewModel @Inject constructor(
     fun deleteRoutine(routine: CommuteRoutine) {
         viewModelScope.launch { repository.deleteRoutine(routine) }
     }
+
+    fun deletePlace(place: SavedPlace) {
+        viewModelScope.launch { repository.deletePlace(place) }
+    }
+
+    fun onSearchQueryChange(query: String) {
+        if (query.isBlank()) {
+            _uiState.update { it.copy(searchSuggestions = emptyList()) }
+            return
+        }
+        viewModelScope.launch {
+            delay(300)
+            try {
+                val key = apiKeyProvider.getMapsApiKey()
+                if (key.isNotEmpty()) {
+                    val response = apiService.getPlaceAutocomplete(input = query, apiKey = key)
+                    _uiState.update { it.copy(searchSuggestions = response.predictions ?: emptyList()) }
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun onPlaceSelected(prediction: Prediction) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isSearching = true) }
+                val key = apiKeyProvider.getMapsApiKey()
+                if (key.isNotEmpty()) {
+                    val response = apiService.getPlaceDetails(prediction.placeId, key)
+                    val location = response.result?.geometry?.location
+                    if (location != null) {
+                        // Extract a short name. Description usually has "Name, City, Country" format.
+                        val shortName = prediction.description.split(",").firstOrNull()?.trim() ?: "Favorite Place"
+                        repository.savePlace(SavedPlace(
+                            name = shortName,
+                            address = prediction.description,
+                            lat = location.lat,
+                            lng = location.lng
+                        ))
+                    }
+                }
+            } catch (e: Exception) { }
+            finally {
+                _uiState.update { it.copy(isSearching = false, searchSuggestions = emptyList()) }
+            }
+        }
+    }
 }
 
 // ─── Add/Edit Routine ViewModel ───────────────────────────────────────────────
@@ -78,18 +141,33 @@ data class RoutineFormState(
     val isSaving: Boolean = false,
     val saved: Boolean = false,
     val etaText: String? = null,
-    val isEtaLoading: Boolean = false
+    val isEtaLoading: Boolean = false,
+    val isNotificationEnabled: Boolean = true,
+    val isPriorityAlert: Boolean = false,
+    val notificationOffsetMins: Int = 15,
+    val notificationCount: Int = 1,
+    val savedPlaces: List<SavedPlace> = emptyList()
 )
 
 @HiltViewModel
 class RoutineFormViewModel @Inject constructor(
     private val repository: CommuteRepository,
     private val apiService: GoogleMapsApiService,
-    private val apiKeyProvider: ApiKeyProvider
+    private val apiKeyProvider: ApiKeyProvider,
+    private val notificationScheduler: com.commuteassistant.notifications.NotificationScheduler,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RoutineFormState())
     val state: StateFlow<RoutineFormState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.observeSavedPlaces().collect { places ->
+                _state.update { it.copy(savedPlaces = places) }
+            }
+        }
+    }
 
     fun onOriginSearchChange(query: String) {
         _state.update { it.copy(originName = query, originLat = 0.0, originLng = 0.0, etaText = null) }
@@ -189,6 +267,24 @@ class RoutineFormViewModel @Inject constructor(
     fun updateTime(hour: Int, minute: Int) =
         _state.update { it.copy(departureHour = hour, departureMinute = minute) }
 
+    fun updateNotificationEnabled(enabled: Boolean) = _state.update { it.copy(isNotificationEnabled = enabled) }
+    fun updatePriorityAlert(priority: Boolean) = _state.update { it.copy(isPriorityAlert = priority) }
+    fun updateNotificationOffset(mins: Int) = _state.update { it.copy(notificationOffsetMins = mins) }
+    fun updateNotificationCount(count: Int) = _state.update { it.copy(notificationCount = count) }
+
+    fun setCurrentLocation(lat: Double, lng: Double) {
+        _state.update { it.copy(originName = "Current Location", originLat = lat, originLng = lng, originSuggestions = emptyList()) }
+        calculateEta()
+    }
+
+    fun onSavedPlaceSelected(place: SavedPlace, isOrigin: Boolean) {
+        _state.update { 
+            if (isOrigin) it.copy(originName = place.name, originLat = place.lat, originLng = place.lng, originSuggestions = emptyList())
+            else it.copy(destinationName = place.name, destinationLat = place.lat, destinationLng = place.lng, destinationSuggestions = emptyList())
+        }
+        calculateEta()
+    }
+
     fun save() {
         val s = _state.value
         if (s.originName.isBlank() || s.destinationName.isBlank() ||
@@ -197,15 +293,30 @@ class RoutineFormViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true) }
-            repository.saveRoutine(
-                CommuteRoutine(
-                    dayOfWeek = s.selectedDay,
-                    usualDepartureTime = LocalTime.of(s.departureHour, s.departureMinute),
-                    originLat = s.originLat, originLng = s.originLng, originName = s.originName,
-                    destinationLat = s.destinationLat, destinationLng = s.destinationLng,
-                    destinationName = s.destinationName
-                )
+            val routine = CommuteRoutine(
+                dayOfWeek = s.selectedDay,
+                usualDepartureTime = LocalTime.of(s.departureHour, s.departureMinute),
+                originLat = s.originLat, originLng = s.originLng, originName = s.originName,
+                destinationLat = s.destinationLat, destinationLng = s.destinationLng,
+                destinationName = s.destinationName,
+                isNotificationEnabled = s.isNotificationEnabled,
+                isPriorityAlert = s.isPriorityAlert,
+                notificationOffsetMins = s.notificationOffsetMins,
+                notificationCount = s.notificationCount
             )
+            val id = repository.saveRoutine(routine)
+            val savedRoutine = routine.copy(id = id)
+            notificationScheduler.scheduleAlertsFor(savedRoutine)
+            
+            if (savedRoutine.isNotificationEnabled) {
+                com.commuteassistant.notifications.TrafficCheckWorker.scheduleForRoutine(
+                    context, id, savedRoutine.notificationOffsetMins
+                )
+            } else {
+                com.commuteassistant.notifications.TrafficCheckWorker.cancel(context) // Wait, we can't cancel all. We can't cancel a unique work unless we know its name. 
+                androidx.work.WorkManager.getInstance(context).cancelUniqueWork("traffic_check_$id")
+            }
+            
             _state.update { it.copy(isSaving = false, saved = true) }
         }
     }

@@ -46,7 +46,7 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `commute_routines` (`id`,`dayOfWeek`,`usualDepartureHour`,`usualDepartureMinute`,`originLat`,`originLng`,`originName`,`destinationLat`,`destinationLng`,`destinationName`,`isActive`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `commute_routines` (`id`,`dayOfWeek`,`usualDepartureHour`,`usualDepartureMinute`,`originLat`,`originLng`,`originName`,`destinationLat`,`destinationLng`,`destinationName`,`isActive`,`isNotificationEnabled`,`isPriorityAlert`,`notificationOffsetMins`,`notificationCount`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -64,6 +64,12 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
         statement.bindString(10, entity.getDestinationName());
         final int _tmp = entity.isActive() ? 1 : 0;
         statement.bindLong(11, _tmp);
+        final int _tmp_1 = entity.isNotificationEnabled() ? 1 : 0;
+        statement.bindLong(12, _tmp_1);
+        final int _tmp_2 = entity.isPriorityAlert() ? 1 : 0;
+        statement.bindLong(13, _tmp_2);
+        statement.bindLong(14, entity.getNotificationOffsetMins());
+        statement.bindLong(15, entity.getNotificationCount());
       }
     };
     this.__deletionAdapterOfCommuteRoutineEntity = new EntityDeletionOrUpdateAdapter<CommuteRoutineEntity>(__db) {
@@ -177,6 +183,10 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
           final int _cursorIndexOfDestinationLng = CursorUtil.getColumnIndexOrThrow(_cursor, "destinationLng");
           final int _cursorIndexOfDestinationName = CursorUtil.getColumnIndexOrThrow(_cursor, "destinationName");
           final int _cursorIndexOfIsActive = CursorUtil.getColumnIndexOrThrow(_cursor, "isActive");
+          final int _cursorIndexOfIsNotificationEnabled = CursorUtil.getColumnIndexOrThrow(_cursor, "isNotificationEnabled");
+          final int _cursorIndexOfIsPriorityAlert = CursorUtil.getColumnIndexOrThrow(_cursor, "isPriorityAlert");
+          final int _cursorIndexOfNotificationOffsetMins = CursorUtil.getColumnIndexOrThrow(_cursor, "notificationOffsetMins");
+          final int _cursorIndexOfNotificationCount = CursorUtil.getColumnIndexOrThrow(_cursor, "notificationCount");
           final List<CommuteRoutineEntity> _result = new ArrayList<CommuteRoutineEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final CommuteRoutineEntity _item;
@@ -204,7 +214,19 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
             final int _tmp;
             _tmp = _cursor.getInt(_cursorIndexOfIsActive);
             _tmpIsActive = _tmp != 0;
-            _item = new CommuteRoutineEntity(_tmpId,_tmpDayOfWeek,_tmpUsualDepartureHour,_tmpUsualDepartureMinute,_tmpOriginLat,_tmpOriginLng,_tmpOriginName,_tmpDestinationLat,_tmpDestinationLng,_tmpDestinationName,_tmpIsActive);
+            final boolean _tmpIsNotificationEnabled;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsNotificationEnabled);
+            _tmpIsNotificationEnabled = _tmp_1 != 0;
+            final boolean _tmpIsPriorityAlert;
+            final int _tmp_2;
+            _tmp_2 = _cursor.getInt(_cursorIndexOfIsPriorityAlert);
+            _tmpIsPriorityAlert = _tmp_2 != 0;
+            final int _tmpNotificationOffsetMins;
+            _tmpNotificationOffsetMins = _cursor.getInt(_cursorIndexOfNotificationOffsetMins);
+            final int _tmpNotificationCount;
+            _tmpNotificationCount = _cursor.getInt(_cursorIndexOfNotificationCount);
+            _item = new CommuteRoutineEntity(_tmpId,_tmpDayOfWeek,_tmpUsualDepartureHour,_tmpUsualDepartureMinute,_tmpOriginLat,_tmpOriginLng,_tmpOriginName,_tmpDestinationLat,_tmpDestinationLng,_tmpDestinationName,_tmpIsActive,_tmpIsNotificationEnabled,_tmpIsPriorityAlert,_tmpNotificationOffsetMins,_tmpNotificationCount);
             _result.add(_item);
           }
           return _result;
@@ -245,6 +267,10 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
           final int _cursorIndexOfDestinationLng = CursorUtil.getColumnIndexOrThrow(_cursor, "destinationLng");
           final int _cursorIndexOfDestinationName = CursorUtil.getColumnIndexOrThrow(_cursor, "destinationName");
           final int _cursorIndexOfIsActive = CursorUtil.getColumnIndexOrThrow(_cursor, "isActive");
+          final int _cursorIndexOfIsNotificationEnabled = CursorUtil.getColumnIndexOrThrow(_cursor, "isNotificationEnabled");
+          final int _cursorIndexOfIsPriorityAlert = CursorUtil.getColumnIndexOrThrow(_cursor, "isPriorityAlert");
+          final int _cursorIndexOfNotificationOffsetMins = CursorUtil.getColumnIndexOrThrow(_cursor, "notificationOffsetMins");
+          final int _cursorIndexOfNotificationCount = CursorUtil.getColumnIndexOrThrow(_cursor, "notificationCount");
           final CommuteRoutineEntity _result;
           if (_cursor.moveToFirst()) {
             final long _tmpId;
@@ -271,7 +297,19 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
             final int _tmp;
             _tmp = _cursor.getInt(_cursorIndexOfIsActive);
             _tmpIsActive = _tmp != 0;
-            _result = new CommuteRoutineEntity(_tmpId,_tmpDayOfWeek,_tmpUsualDepartureHour,_tmpUsualDepartureMinute,_tmpOriginLat,_tmpOriginLng,_tmpOriginName,_tmpDestinationLat,_tmpDestinationLng,_tmpDestinationName,_tmpIsActive);
+            final boolean _tmpIsNotificationEnabled;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsNotificationEnabled);
+            _tmpIsNotificationEnabled = _tmp_1 != 0;
+            final boolean _tmpIsPriorityAlert;
+            final int _tmp_2;
+            _tmp_2 = _cursor.getInt(_cursorIndexOfIsPriorityAlert);
+            _tmpIsPriorityAlert = _tmp_2 != 0;
+            final int _tmpNotificationOffsetMins;
+            _tmpNotificationOffsetMins = _cursor.getInt(_cursorIndexOfNotificationOffsetMins);
+            final int _tmpNotificationCount;
+            _tmpNotificationCount = _cursor.getInt(_cursorIndexOfNotificationCount);
+            _result = new CommuteRoutineEntity(_tmpId,_tmpDayOfWeek,_tmpUsualDepartureHour,_tmpUsualDepartureMinute,_tmpOriginLat,_tmpOriginLng,_tmpOriginName,_tmpDestinationLat,_tmpDestinationLng,_tmpDestinationName,_tmpIsActive,_tmpIsNotificationEnabled,_tmpIsPriorityAlert,_tmpNotificationOffsetMins,_tmpNotificationCount);
           } else {
             _result = null;
           }
@@ -309,6 +347,10 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
           final int _cursorIndexOfDestinationLng = CursorUtil.getColumnIndexOrThrow(_cursor, "destinationLng");
           final int _cursorIndexOfDestinationName = CursorUtil.getColumnIndexOrThrow(_cursor, "destinationName");
           final int _cursorIndexOfIsActive = CursorUtil.getColumnIndexOrThrow(_cursor, "isActive");
+          final int _cursorIndexOfIsNotificationEnabled = CursorUtil.getColumnIndexOrThrow(_cursor, "isNotificationEnabled");
+          final int _cursorIndexOfIsPriorityAlert = CursorUtil.getColumnIndexOrThrow(_cursor, "isPriorityAlert");
+          final int _cursorIndexOfNotificationOffsetMins = CursorUtil.getColumnIndexOrThrow(_cursor, "notificationOffsetMins");
+          final int _cursorIndexOfNotificationCount = CursorUtil.getColumnIndexOrThrow(_cursor, "notificationCount");
           final List<CommuteRoutineEntity> _result = new ArrayList<CommuteRoutineEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final CommuteRoutineEntity _item;
@@ -336,7 +378,19 @@ public final class CommuteRoutineDao_Impl implements CommuteRoutineDao {
             final int _tmp;
             _tmp = _cursor.getInt(_cursorIndexOfIsActive);
             _tmpIsActive = _tmp != 0;
-            _item = new CommuteRoutineEntity(_tmpId,_tmpDayOfWeek,_tmpUsualDepartureHour,_tmpUsualDepartureMinute,_tmpOriginLat,_tmpOriginLng,_tmpOriginName,_tmpDestinationLat,_tmpDestinationLng,_tmpDestinationName,_tmpIsActive);
+            final boolean _tmpIsNotificationEnabled;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsNotificationEnabled);
+            _tmpIsNotificationEnabled = _tmp_1 != 0;
+            final boolean _tmpIsPriorityAlert;
+            final int _tmp_2;
+            _tmp_2 = _cursor.getInt(_cursorIndexOfIsPriorityAlert);
+            _tmpIsPriorityAlert = _tmp_2 != 0;
+            final int _tmpNotificationOffsetMins;
+            _tmpNotificationOffsetMins = _cursor.getInt(_cursorIndexOfNotificationOffsetMins);
+            final int _tmpNotificationCount;
+            _tmpNotificationCount = _cursor.getInt(_cursorIndexOfNotificationCount);
+            _item = new CommuteRoutineEntity(_tmpId,_tmpDayOfWeek,_tmpUsualDepartureHour,_tmpUsualDepartureMinute,_tmpOriginLat,_tmpOriginLng,_tmpOriginName,_tmpDestinationLat,_tmpDestinationLng,_tmpDestinationName,_tmpIsActive,_tmpIsNotificationEnabled,_tmpIsPriorityAlert,_tmpNotificationOffsetMins,_tmpNotificationCount);
             _result.add(_item);
           }
           return _result;

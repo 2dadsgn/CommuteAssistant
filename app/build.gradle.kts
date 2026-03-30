@@ -1,3 +1,7 @@
+
+
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,8 +21,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // 🔑 Add your Google Maps API key in local.properties as MAPS_API_KEY=your_key
-        val localProperties = java.util.Properties()
+        val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
             localProperties.load(localPropertiesFile.inputStream())

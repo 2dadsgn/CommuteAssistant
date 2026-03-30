@@ -3,8 +3,9 @@ package com.commuteassistant.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -29,6 +30,14 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showAddPlaceDialog by remember { mutableStateOf(false) }
+
+    if (showAddPlaceDialog) {
+        AddPlaceDialog(
+            viewModel = viewModel,
+            onDismiss = { showAddPlaceDialog = false }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -71,23 +80,115 @@ fun HomeScreen(
 
                 uiState.routines.isEmpty() -> EmptyState(onAddRoutine)
 
-                else -> LazyColumn(
+                else -> androidx.compose.foundation.lazy.LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
                 ) {
-                    items(uiState.routines, key = { it.id }) { routine ->
-                        RoutineCard(
-                            routine = routine,
-                            recommendation = uiState.recommendations[routine.id],
-                            onDelete = { viewModel.deleteRoutine(routine) }
+                    item {
+                        SavedPlacesCarousel(
+                            places = uiState.savedPlaces,
+                            onAddPlace = { showAddPlaceDialog = true }
                         )
+                        Spacer(Modifier.height(16.dp))
                     }
-                    item { Spacer(Modifier.height(80.dp)) } // FAB clearance
+                    
+                    items(uiState.routines, key = { it.id }) { routine ->
+                        Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                            RoutineCard(
+                                routine = routine,
+                                recommendation = uiState.recommendations[routine.id],
+                                onDelete = { viewModel.deleteRoutine(routine) }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SavedPlacesCarousel(places: List<SavedPlace>, onAddPlace: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text("My Places", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(Modifier.height(8.dp))
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(places, key = { it.id }) { place ->
+                ElevatedAssistChip(
+                    onClick = { /* Could auto-start route prep here */ },
+                    label = { Text(place.name) },
+                    leadingIcon = { Icon(Icons.Default.Place, null, modifier = Modifier.size(16.dp)) }
+                )
+            }
+            item {
+                ElevatedAssistChip(
+                    onClick = onAddPlace,
+                    label = { Text("Add Place") },
+                    leadingIcon = { Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp)) },
+                    colors = AssistChipDefaults.elevatedAssistChipColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddPlaceDialog(
+    viewModel: HomeViewModel,
+    onDismiss: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var query by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add a Favorite Place") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { 
+                        query = it
+                        viewModel.onSearchQueryChange(it) 
+                    },
+                    label = { Text("Search location") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                if (uiState.isSearching) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
+                }
+                
+                if (uiState.searchSuggestions.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp)
+                    ) {
+                        items(uiState.searchSuggestions) { prediction ->
+                            ListItem(
+                                headlineContent = { Text(prediction.description, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                                modifier = Modifier.clickable {
+                                    viewModel.onPlaceSelected(prediction)
+                                    onDismiss()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -135,7 +236,7 @@ private fun RoutineCard(
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    "Usual departure: ${routine.usualDepartureTime.format(timeFormatter)}",
+                    "Target arrival: ${routine.usualDepartureTime.format(timeFormatter)}",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

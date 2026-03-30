@@ -117,7 +117,7 @@
 64        <meta-data
 65            android:name="com.google.android.geo.API_KEY"
 65-->C:\Users\dlubr\OneDrive\Desktop\CommuteAssistant\app\src\main\AndroidManifest.xml:37:13-58
-66            android:value="" />
+66            android:value="AIzaSyCxcV5BFe9WH44u3FVWTQvWwhD_0epDi-I" />
 66-->C:\Users\dlubr\OneDrive\Desktop\CommuteAssistant\app\src\main\AndroidManifest.xml:38:13-44
 67
 68        <!-- WorkManager -->
