@@ -10,12 +10,10 @@ import com.commuteassistant.data.ApiKeyProvider;
 import com.commuteassistant.data.GoogleMapsApiService;
 import com.commuteassistant.data.db.CommuteDatabase;
 import com.commuteassistant.data.db.CommuteRoutineDao;
-import com.commuteassistant.data.db.SavedPlaceDao;
 import com.commuteassistant.data.db.TrafficSnapshotDao;
 import com.commuteassistant.data.repository.CommuteRepository;
 import com.commuteassistant.di.AppModule_ProvideDatabaseFactory;
 import com.commuteassistant.di.AppModule_ProvideRoutineDaoFactory;
-import com.commuteassistant.di.AppModule_ProvideSavedPlaceDaoFactory;
 import com.commuteassistant.di.AppModule_ProvideSnapshotDaoFactory;
 import com.commuteassistant.di.NetworkModule_ProvideGoogleMapsApiServiceFactory;
 import com.commuteassistant.di.NetworkModule_ProvideMoshiFactory;
@@ -412,15 +410,15 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_commuteassistant_viewmodel_HomeViewModel = "com.commuteassistant.viewmodel.HomeViewModel";
-
       static String com_commuteassistant_viewmodel_RoutineFormViewModel = "com.commuteassistant.viewmodel.RoutineFormViewModel";
 
-      @KeepFieldType
-      HomeViewModel com_commuteassistant_viewmodel_HomeViewModel2;
+      static String com_commuteassistant_viewmodel_HomeViewModel = "com.commuteassistant.viewmodel.HomeViewModel";
 
       @KeepFieldType
       RoutineFormViewModel com_commuteassistant_viewmodel_RoutineFormViewModel2;
+
+      @KeepFieldType
+      HomeViewModel com_commuteassistant_viewmodel_HomeViewModel2;
     }
   }
 
@@ -497,7 +495,7 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.commuteassistant.viewmodel.HomeViewModel 
-          return (T) new HomeViewModel(singletonCImpl.commuteRepositoryProvider.get(), singletonCImpl.getDepartureRecommendationUseCase(), singletonCImpl.provideGoogleMapsApiServiceProvider.get(), singletonCImpl.apiKeyProvider.get());
+          return (T) new HomeViewModel(singletonCImpl.commuteRepositoryProvider.get(), singletonCImpl.getDepartureRecommendationUseCase());
 
           case 1: // com.commuteassistant.viewmodel.RoutineFormViewModel 
           return (T) new RoutineFormViewModel(singletonCImpl.commuteRepositoryProvider.get(), singletonCImpl.provideGoogleMapsApiServiceProvider.get(), singletonCImpl.apiKeyProvider.get(), singletonCImpl.notificationSchedulerProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
@@ -610,10 +608,6 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
       return AppModule_ProvideSnapshotDaoFactory.provideSnapshotDao(provideDatabaseProvider.get());
     }
 
-    private SavedPlaceDao savedPlaceDao() {
-      return AppModule_ProvideSavedPlaceDaoFactory.provideSavedPlaceDao(provideDatabaseProvider.get());
-    }
-
     private GetDepartureRecommendationUseCase getDepartureRecommendationUseCase() {
       return new GetDepartureRecommendationUseCase(commuteRepositoryProvider.get(), provideGoogleMapsApiServiceProvider.get(), apiKeyProvider.get());
     }
@@ -692,7 +686,7 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.commuteassistant.data.repository.CommuteRepository 
-          return (T) new CommuteRepository(singletonCImpl.commuteRoutineDao(), singletonCImpl.trafficSnapshotDao(), singletonCImpl.savedPlaceDao());
+          return (T) new CommuteRepository(singletonCImpl.commuteRoutineDao(), singletonCImpl.trafficSnapshotDao());
 
           case 1: // com.commuteassistant.data.db.CommuteDatabase 
           return (T) AppModule_ProvideDatabaseFactory.provideDatabase(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));

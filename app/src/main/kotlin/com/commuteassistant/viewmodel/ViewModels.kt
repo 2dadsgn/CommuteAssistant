@@ -12,11 +12,19 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
+import android.location.Geocoder
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import java.time.DayOfWeek
 import java.time.LocalTime
+import java.util.Locale
 import javax.inject.Inject
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 data class HomeUiState(
     val routines: List<CommuteRoutine> = emptyList(),
@@ -84,7 +92,9 @@ data class RoutineFormState(
     val isNotificationEnabled: Boolean = true,
     val isPriorityAlert: Boolean = false,
     val notificationOffsetMins: Int = 15,
-    val notificationCount: Int = 1
+    val notificationCount: Int = 1,
+    val isLoadingLocation: Boolean = false,   // ← new
+    val locationError: String? = null          // ← new
 )
 
 @HiltViewModel
@@ -166,6 +176,54 @@ class RoutineFormViewModel @Inject constructor(
         }
     }
 
+    // ── Current Location ──────────────────────────────────────────────────────
+
+    fun useCurrentLocationAsOrigin() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingLocation = true, locationError = null) }
+            try {
+                val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+                val cts = CancellationTokenSource()
+
+                val location = suspendCancellableCoroutine<android.location.Location?> { cont ->
+                    fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                        .addOnSuccessListener { cont.resume(it) }
+                        .addOnFailureListener { cont.resumeWithException(it) }
+                    cont.invokeOnCancellation { cts.cancel() }
+                }
+
+                if (location == null) {
+                    _state.update { it.copy(isLoadingLocation = false, locationError = "Location unavailable") }
+                    return@launch
+                }
+
+                @Suppress("DEPRECATION")
+                val addresses = Geocoder(context, Locale.getDefault())
+                    .getFromLocation(location.latitude, location.longitude, 1)
+                val addressLine = addresses?.firstOrNull()?.getAddressLine(0) ?: "Current Location"
+
+                _state.update {
+                    it.copy(
+                        originName = addressLine,
+                        originLat = location.latitude,
+                        originLng = location.longitude,
+                        originSuggestions = emptyList(),
+                        isLoadingLocation = false,
+                        locationError = null
+                    )
+                }
+                calculateEta()
+
+            } catch (e: SecurityException) {
+                _state.update { it.copy(isLoadingLocation = false, locationError = "Location permission denied") }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoadingLocation = false, locationError = "Could not get location") }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun calculateEta() {
         val s = _state.value
         if (s.originLat != 0.0 && s.originLng != 0.0 && s.destinationLat != 0.0 && s.destinationLng != 0.0) {
@@ -224,16 +282,15 @@ class RoutineFormViewModel @Inject constructor(
             val id = repository.saveRoutine(routine)
             val savedRoutine = routine.copy(id = id)
             notificationScheduler.scheduleAlertsFor(savedRoutine)
-            
+
             if (savedRoutine.isNotificationEnabled) {
                 com.commuteassistant.notifications.TrafficCheckWorker.scheduleForRoutine(
                     context, id, savedRoutine.notificationOffsetMins
                 )
             } else {
-                com.commuteassistant.notifications.TrafficCheckWorker.cancel(context) // Wait, we can't cancel all. We can't cancel a unique work unless we know its name. 
                 androidx.work.WorkManager.getInstance(context).cancelUniqueWork("traffic_check_$id")
             }
-            
+
             _state.update { it.copy(isSaving = false, saved = true) }
         }
     }

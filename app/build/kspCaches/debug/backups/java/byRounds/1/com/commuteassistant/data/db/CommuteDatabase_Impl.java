@@ -30,26 +30,22 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
 
   private volatile TrafficSnapshotDao _trafficSnapshotDao;
 
-  private volatile SavedPlaceDao _savedPlaceDao;
-
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(3) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `commute_routines` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `dayOfWeek` INTEGER NOT NULL, `usualDepartureHour` INTEGER NOT NULL, `usualDepartureMinute` INTEGER NOT NULL, `originLat` REAL NOT NULL, `originLng` REAL NOT NULL, `originName` TEXT NOT NULL, `destinationLat` REAL NOT NULL, `destinationLng` REAL NOT NULL, `destinationName` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `isNotificationEnabled` INTEGER NOT NULL, `isPriorityAlert` INTEGER NOT NULL, `notificationOffsetMins` INTEGER NOT NULL, `notificationCount` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `traffic_snapshots` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `routineId` INTEGER NOT NULL, `capturedAt` INTEGER NOT NULL, `durationMinutes` INTEGER NOT NULL, `normalDurationMinutes` INTEGER NOT NULL, `congestionLevel` TEXT NOT NULL)");
-        db.execSQL("CREATE TABLE IF NOT EXISTS `saved_places` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `address` TEXT NOT NULL, `lat` REAL NOT NULL, `lng` REAL NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '627f06f2a339be445d6775fc3807ee59')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '90db77a5a56bc7be9b2c9a184e0e684d')");
       }
 
       @Override
       public void dropAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("DROP TABLE IF EXISTS `commute_routines`");
         db.execSQL("DROP TABLE IF EXISTS `traffic_snapshots`");
-        db.execSQL("DROP TABLE IF EXISTS `saved_places`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -134,24 +130,9 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
                   + " Expected:\n" + _infoTrafficSnapshots + "\n"
                   + " Found:\n" + _existingTrafficSnapshots);
         }
-        final HashMap<String, TableInfo.Column> _columnsSavedPlaces = new HashMap<String, TableInfo.Column>(5);
-        _columnsSavedPlaces.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
-        _columnsSavedPlaces.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
-        _columnsSavedPlaces.put("address", new TableInfo.Column("address", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
-        _columnsSavedPlaces.put("lat", new TableInfo.Column("lat", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
-        _columnsSavedPlaces.put("lng", new TableInfo.Column("lng", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
-        final HashSet<TableInfo.ForeignKey> _foreignKeysSavedPlaces = new HashSet<TableInfo.ForeignKey>(0);
-        final HashSet<TableInfo.Index> _indicesSavedPlaces = new HashSet<TableInfo.Index>(0);
-        final TableInfo _infoSavedPlaces = new TableInfo("saved_places", _columnsSavedPlaces, _foreignKeysSavedPlaces, _indicesSavedPlaces);
-        final TableInfo _existingSavedPlaces = TableInfo.read(db, "saved_places");
-        if (!_infoSavedPlaces.equals(_existingSavedPlaces)) {
-          return new RoomOpenHelper.ValidationResult(false, "saved_places(com.commuteassistant.data.db.SavedPlaceEntity).\n"
-                  + " Expected:\n" + _infoSavedPlaces + "\n"
-                  + " Found:\n" + _existingSavedPlaces);
-        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "627f06f2a339be445d6775fc3807ee59", "c0f5ec0275e212eeb9afa37f330cfba8");
+    }, "90db77a5a56bc7be9b2c9a184e0e684d", "252d0ed1448511d9d9aa6533e2e36315");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -162,7 +143,7 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "commute_routines","traffic_snapshots","saved_places");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "commute_routines","traffic_snapshots");
   }
 
   @Override
@@ -173,7 +154,6 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
       super.beginTransaction();
       _db.execSQL("DELETE FROM `commute_routines`");
       _db.execSQL("DELETE FROM `traffic_snapshots`");
-      _db.execSQL("DELETE FROM `saved_places`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -190,7 +170,6 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
     final HashMap<Class<?>, List<Class<?>>> _typeConvertersMap = new HashMap<Class<?>, List<Class<?>>>();
     _typeConvertersMap.put(CommuteRoutineDao.class, CommuteRoutineDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(TrafficSnapshotDao.class, TrafficSnapshotDao_Impl.getRequiredConverters());
-    _typeConvertersMap.put(SavedPlaceDao.class, SavedPlaceDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -233,20 +212,6 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
           _trafficSnapshotDao = new TrafficSnapshotDao_Impl(this);
         }
         return _trafficSnapshotDao;
-      }
-    }
-  }
-
-  @Override
-  public SavedPlaceDao savedPlaceDao() {
-    if (_savedPlaceDao != null) {
-      return _savedPlaceDao;
-    } else {
-      synchronized(this) {
-        if(_savedPlaceDao == null) {
-          _savedPlaceDao = new SavedPlaceDao_Impl(this);
-        }
-        return _savedPlaceDao;
       }
     }
   }
