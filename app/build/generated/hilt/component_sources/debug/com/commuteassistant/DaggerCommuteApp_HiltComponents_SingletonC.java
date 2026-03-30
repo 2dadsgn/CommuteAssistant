@@ -6,6 +6,8 @@ import android.view.View;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
+import com.commuteassistant.data.ApiKeyProvider;
+import com.commuteassistant.data.GoogleMapsApiService;
 import com.commuteassistant.data.db.CommuteDatabase;
 import com.commuteassistant.data.db.CommuteRoutineDao;
 import com.commuteassistant.data.db.TrafficSnapshotDao;
@@ -13,11 +15,15 @@ import com.commuteassistant.data.repository.CommuteRepository;
 import com.commuteassistant.di.AppModule_ProvideDatabaseFactory;
 import com.commuteassistant.di.AppModule_ProvideRoutineDaoFactory;
 import com.commuteassistant.di.AppModule_ProvideSnapshotDaoFactory;
+import com.commuteassistant.di.NetworkModule_ProvideGoogleMapsApiServiceFactory;
+import com.commuteassistant.di.NetworkModule_ProvideMoshiFactory;
+import com.commuteassistant.di.NetworkModule_ProvideOkHttpClientFactory;
 import com.commuteassistant.domain.usecase.GetDepartureRecommendationUseCase;
 import com.commuteassistant.viewmodel.HomeViewModel;
 import com.commuteassistant.viewmodel.HomeViewModel_HiltModules;
 import com.commuteassistant.viewmodel.RoutineFormViewModel;
 import com.commuteassistant.viewmodel.RoutineFormViewModel_HiltModules;
+import com.squareup.moshi.Moshi;
 import dagger.hilt.android.ActivityRetainedLifecycle;
 import dagger.hilt.android.ViewModelLifecycle;
 import dagger.hilt.android.internal.builders.ActivityComponentBuilder;
@@ -45,6 +51,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.processing.Generated;
+import okhttp3.OkHttpClient;
 
 @DaggerGenerated
 @Generated(
@@ -432,7 +439,7 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
     }
 
     private GetDepartureRecommendationUseCase getDepartureRecommendationUseCase() {
-      return new GetDepartureRecommendationUseCase(singletonCImpl.commuteRepositoryProvider.get());
+      return new GetDepartureRecommendationUseCase(singletonCImpl.commuteRepositoryProvider.get(), singletonCImpl.provideGoogleMapsApiServiceProvider.get(), singletonCImpl.apiKeyProvider.get());
     }
 
     @SuppressWarnings("unchecked")
@@ -490,7 +497,7 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
           return (T) new HomeViewModel(singletonCImpl.commuteRepositoryProvider.get(), viewModelCImpl.getDepartureRecommendationUseCase());
 
           case 1: // com.commuteassistant.viewmodel.RoutineFormViewModel 
-          return (T) new RoutineFormViewModel(singletonCImpl.commuteRepositoryProvider.get());
+          return (T) new RoutineFormViewModel(singletonCImpl.commuteRepositoryProvider.get(), singletonCImpl.provideGoogleMapsApiServiceProvider.get(), singletonCImpl.apiKeyProvider.get());
 
           default: throw new AssertionError(id);
         }
@@ -576,6 +583,14 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
 
     private Provider<CommuteRepository> commuteRepositoryProvider;
 
+    private Provider<OkHttpClient> provideOkHttpClientProvider;
+
+    private Provider<Moshi> provideMoshiProvider;
+
+    private Provider<GoogleMapsApiService> provideGoogleMapsApiServiceProvider;
+
+    private Provider<ApiKeyProvider> apiKeyProvider;
+
     private SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
       this.applicationContextModule = applicationContextModuleParam;
       initialize(applicationContextModuleParam);
@@ -594,6 +609,10 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
     private void initialize(final ApplicationContextModule applicationContextModuleParam) {
       this.provideDatabaseProvider = DoubleCheck.provider(new SwitchingProvider<CommuteDatabase>(singletonCImpl, 1));
       this.commuteRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<CommuteRepository>(singletonCImpl, 0));
+      this.provideOkHttpClientProvider = DoubleCheck.provider(new SwitchingProvider<OkHttpClient>(singletonCImpl, 3));
+      this.provideMoshiProvider = DoubleCheck.provider(new SwitchingProvider<Moshi>(singletonCImpl, 4));
+      this.provideGoogleMapsApiServiceProvider = DoubleCheck.provider(new SwitchingProvider<GoogleMapsApiService>(singletonCImpl, 2));
+      this.apiKeyProvider = DoubleCheck.provider(new SwitchingProvider<ApiKeyProvider>(singletonCImpl, 5));
     }
 
     @Override
@@ -634,6 +653,18 @@ public final class DaggerCommuteApp_HiltComponents_SingletonC {
 
           case 1: // com.commuteassistant.data.db.CommuteDatabase 
           return (T) AppModule_ProvideDatabaseFactory.provideDatabase(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+
+          case 2: // com.commuteassistant.data.GoogleMapsApiService 
+          return (T) NetworkModule_ProvideGoogleMapsApiServiceFactory.provideGoogleMapsApiService(singletonCImpl.provideOkHttpClientProvider.get(), singletonCImpl.provideMoshiProvider.get());
+
+          case 3: // okhttp3.OkHttpClient 
+          return (T) NetworkModule_ProvideOkHttpClientFactory.provideOkHttpClient();
+
+          case 4: // com.squareup.moshi.Moshi 
+          return (T) NetworkModule_ProvideMoshiFactory.provideMoshi();
+
+          case 5: // com.commuteassistant.data.ApiKeyProvider 
+          return (T) new ApiKeyProvider(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           default: throw new AssertionError(id);
         }

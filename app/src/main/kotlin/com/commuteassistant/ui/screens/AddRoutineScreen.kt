@@ -1,6 +1,7 @@
 package com.commuteassistant.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,6 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.commuteassistant.viewmodel.RoutineFormViewModel
+import com.commuteassistant.notifications.TrafficCheckWorker
+import com.commuteassistant.data.Prediction
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.DayOfWeek
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,10 +26,14 @@ fun AddRoutineScreen(
     viewModel: RoutineFormViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
 
     // Navigate back when saved
     LaunchedEffect(state.saved) {
-        if (state.saved) onBack()
+        if (state.saved) {
+            TrafficCheckWorker.schedule(context)
+            onBack()
+        }
     }
 
     Scaffold(
@@ -50,39 +59,28 @@ fun AddRoutineScreen(
 
             // ── Origin ────────────────────────────────────────────────────────
             SectionHeader("Starting Point")
-            OutlinedTextField(
-                value = state.originName,
-                onValueChange = { viewModel.updateOrigin(it, state.originLat, state.originLng) },
-                label = { Text("Home / Origin address") },
-                leadingIcon = { Icon(Icons.Default.Home, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            // Placeholder for map picker — wire up Maps SDK here
-            CoordinateRow(
-                lat = state.originLat, lng = state.originLng,
-                onLatChange = { viewModel.updateOrigin(state.originName, it, state.originLng) },
-                onLngChange = { viewModel.updateOrigin(state.originName, state.originLat, it) }
+            AutocompleteTextField(
+                query = state.originName,
+                onQueryChange = viewModel::onOriginSearchChange,
+                suggestions = state.originSuggestions,
+                onSuggestionSelected = viewModel::onOriginSelected,
+                label = "Home / Origin address",
+                leadingIcon = Icons.Default.Home
             )
 
             // ── Destination ───────────────────────────────────────────────────
             SectionHeader("Destination")
-            OutlinedTextField(
-                value = state.destinationName,
-                onValueChange = { viewModel.updateDestination(it, state.destinationLat, state.destinationLng) },
-                label = { Text("Work / Destination address") },
-                leadingIcon = { Icon(Icons.Default.Work, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            CoordinateRow(
-                lat = state.destinationLat, lng = state.destinationLng,
-                onLatChange = { viewModel.updateDestination(state.destinationName, it, state.destinationLng) },
-                onLngChange = { viewModel.updateDestination(state.destinationName, state.destinationLat, it) }
+            AutocompleteTextField(
+                query = state.destinationName,
+                onQueryChange = viewModel::onDestinationSearchChange,
+                suggestions = state.destinationSuggestions,
+                onSuggestionSelected = viewModel::onDestinationSelected,
+                label = "Work / Destination address",
+                leadingIcon = Icons.Default.Work
             )
 
             // ── Day picker ────────────────────────────────────────────────────
-            SectionHeader("Day of Week") //todo possibility to pick more than one day
+            SectionHeader("Day of Week") //TODO: possibility to pick more than one day
             DayPicker(selected = state.selectedDay, onSelect = { viewModel.updateDay(it) })
 
             // ── Time picker ───────────────────────────────────────────────────
@@ -95,11 +93,40 @@ fun AddRoutineScreen(
 
             Spacer(Modifier.height(8.dp))
 
+            // ── ETA Display ───────────────────────────────────────────────────
+            if (state.isEtaLoading) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Calculating ETA...", style = MaterialTheme.typography.bodyMedium)
+                }
+            } else if (state.etaText != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.DirectionsCar, contentDescription = "ETA")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text("Approximate ETA: ${state.etaText}", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+
             // ── Save ──────────────────────────────────────────────────────────
             Button(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled = !state.isSaving && state.originName.isNotBlank() && state.destinationName.isNotBlank()
+                enabled = !state.isSaving && 
+                          state.originName.isNotBlank() && state.destinationName.isNotBlank() &&
+                          state.originLat != 0.0 && state.destinationLat != 0.0
             ) {
                 if (state.isSaving) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp,
@@ -119,33 +146,56 @@ private fun SectionHeader(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CoordinateRow(
-    lat: Double, lng: Double,
-    onLatChange: (Double) -> Unit,
-    onLngChange: (Double) -> Unit
+fun AutocompleteTextField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    suggestions: List<Prediction>,
+    onSuggestionSelected: (Prediction) -> Unit,
+    label: String,
+    leadingIcon: ImageVector
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = if (lat == 0.0) "" else lat.toString(),
-            onValueChange = { onLatChange(it.toDoubleOrNull() ?: 0.0) },
-            label = { Text("Lat") },
-            modifier = Modifier.weight(1f),
-            singleLine = true
-        )
-        OutlinedTextField(
-            value = if (lng == 0.0) "" else lng.toString(),
-            onValueChange = { onLngChange(it.toDoubleOrNull() ?: 0.0) },
-            label = { Text("Lng") },
-            modifier = Modifier.weight(1f),
-            singleLine = true
-        )
+    var expanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(suggestions) {
+        expanded = suggestions.isNotEmpty()
     }
-    Text(
-        "💡 Tip: long-press on Google Maps to copy coordinates",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-    )
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = {
+                onQueryChange(it)
+                expanded = true
+            },
+            label = { Text(label) },
+            leadingIcon = { Icon(leadingIcon, contentDescription = null) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            singleLine = true
+        )
+        if (suggestions.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                suggestions.forEach { prediction ->
+                    DropdownMenuItem(
+                        text = { Text(prediction.description) },
+                        onClick = {
+                            onSuggestionSelected(prediction)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

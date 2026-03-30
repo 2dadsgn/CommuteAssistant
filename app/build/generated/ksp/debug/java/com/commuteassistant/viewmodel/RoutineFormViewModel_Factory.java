@@ -1,5 +1,7 @@
 package com.commuteassistant.viewmodel;
 
+import com.commuteassistant.data.ApiKeyProvider;
+import com.commuteassistant.data.GoogleMapsApiService;
 import com.commuteassistant.data.repository.CommuteRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -25,21 +27,29 @@ import javax.inject.Provider;
 public final class RoutineFormViewModel_Factory implements Factory<RoutineFormViewModel> {
   private final Provider<CommuteRepository> repositoryProvider;
 
-  public RoutineFormViewModel_Factory(Provider<CommuteRepository> repositoryProvider) {
+  private final Provider<GoogleMapsApiService> apiServiceProvider;
+
+  private final Provider<ApiKeyProvider> apiKeyProvider;
+
+  public RoutineFormViewModel_Factory(Provider<CommuteRepository> repositoryProvider,
+      Provider<GoogleMapsApiService> apiServiceProvider, Provider<ApiKeyProvider> apiKeyProvider) {
     this.repositoryProvider = repositoryProvider;
+    this.apiServiceProvider = apiServiceProvider;
+    this.apiKeyProvider = apiKeyProvider;
   }
 
   @Override
   public RoutineFormViewModel get() {
-    return newInstance(repositoryProvider.get());
+    return newInstance(repositoryProvider.get(), apiServiceProvider.get(), apiKeyProvider.get());
   }
 
-  public static RoutineFormViewModel_Factory create(
-      Provider<CommuteRepository> repositoryProvider) {
-    return new RoutineFormViewModel_Factory(repositoryProvider);
+  public static RoutineFormViewModel_Factory create(Provider<CommuteRepository> repositoryProvider,
+      Provider<GoogleMapsApiService> apiServiceProvider, Provider<ApiKeyProvider> apiKeyProvider) {
+    return new RoutineFormViewModel_Factory(repositoryProvider, apiServiceProvider, apiKeyProvider);
   }
 
-  public static RoutineFormViewModel newInstance(CommuteRepository repository) {
-    return new RoutineFormViewModel(repository);
+  public static RoutineFormViewModel newInstance(CommuteRepository repository,
+      GoogleMapsApiService apiService, ApiKeyProvider apiKeyProvider) {
+    return new RoutineFormViewModel(repository, apiService, apiKeyProvider);
   }
 }

@@ -21,6 +21,7 @@ import hilt_aggregated_deps._androidx_hilt_work_HiltWrapper_WorkerFactoryModule;
 import hilt_aggregated_deps._com_commuteassistant_CommuteApp_GeneratedInjector;
 import hilt_aggregated_deps._com_commuteassistant_MainActivity_GeneratedInjector;
 import hilt_aggregated_deps._com_commuteassistant_di_AppModule;
+import hilt_aggregated_deps._com_commuteassistant_di_NetworkModule;
 import hilt_aggregated_deps._com_commuteassistant_notifications_TrafficCheckWorker_HiltModule;
 import hilt_aggregated_deps._com_commuteassistant_viewmodel_HomeViewModel_HiltModules_BindsModule;
 import hilt_aggregated_deps._com_commuteassistant_viewmodel_HomeViewModel_HiltModules_KeyModule;
@@ -70,6 +71,7 @@ import hilt_aggregated_deps._dagger_hilt_android_internal_modules_HiltWrapper_Ac
         _com_commuteassistant_CommuteApp_GeneratedInjector.class,
         _com_commuteassistant_MainActivity_GeneratedInjector.class,
         _com_commuteassistant_di_AppModule.class,
+        _com_commuteassistant_di_NetworkModule.class,
         _com_commuteassistant_notifications_TrafficCheckWorker_HiltModule.class,
         _com_commuteassistant_viewmodel_HomeViewModel_HiltModules_BindsModule.class,
         _com_commuteassistant_viewmodel_HomeViewModel_HiltModules_KeyModule.class,
