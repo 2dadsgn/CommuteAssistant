@@ -1,3 +1,7 @@
+
+
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,8 +21,12 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // 🔑 Add your Google Maps API key in local.properties as MAPS_API_KEY=your_key
-        manifestPlaceholders["MAPS_API_KEY"] = project.findProperty("MAPS_API_KEY") ?: ""
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(localPropertiesFile.inputStream())
+        }
+        manifestPlaceholders["TOMTOM_API_KEY"] = localProperties.getProperty("TOMTOM_API_KEY") ?: ""
     }
 
     buildTypes {
@@ -31,6 +39,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        baseline = file("lint-baseline.xml")
     }
 
     kotlinOptions { jvmTarget = "17" }
@@ -69,8 +81,6 @@ dependencies {
     ksp(libs.hilt.work.compiler)
 
     // Maps & Location
-    implementation(libs.maps.compose)
-    implementation(libs.play.services.maps)
     implementation(libs.play.services.location)
     implementation(libs.kotlinx.coroutines.play.services)
 
@@ -78,4 +88,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)
+
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.moshi)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.moshi)
 }

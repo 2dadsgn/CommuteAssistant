@@ -2,6 +2,9 @@ package com.commuteassistant;
 
 import androidx.hilt.work.HiltWrapper_WorkerFactoryModule;
 import com.commuteassistant.di.AppModule;
+import com.commuteassistant.di.NetworkModule;
+import com.commuteassistant.notifications.BootReceiver_GeneratedInjector;
+import com.commuteassistant.notifications.NotificationReceiver_GeneratedInjector;
 import com.commuteassistant.notifications.TrafficCheckWorker_HiltModule;
 import com.commuteassistant.viewmodel.HomeViewModel_HiltModules;
 import com.commuteassistant.viewmodel.RoutineFormViewModel_HiltModules;
@@ -135,11 +138,14 @@ public final class CommuteApp_HiltComponents {
           ServiceCBuilderModule.class,
           HiltWrapper_FragmentGetContextFix_FragmentGetContextFixModule.class,
           HiltWrapper_WorkerFactoryModule.class,
+          NetworkModule.class,
           TrafficCheckWorker_HiltModule.class
       }
   )
   @Singleton
   public abstract static class SingletonC implements CommuteApp_GeneratedInjector,
+      BootReceiver_GeneratedInjector,
+      NotificationReceiver_GeneratedInjector,
       FragmentGetContextFix.FragmentGetContextFixEntryPoint,
       HiltWrapper_ActivityRetainedComponentManager_ActivityRetainedComponentBuilderEntryPoint,
       ServiceComponentManager.ServiceComponentBuilderEntryPoint,

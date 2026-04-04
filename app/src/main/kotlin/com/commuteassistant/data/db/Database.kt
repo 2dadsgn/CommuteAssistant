@@ -19,7 +19,11 @@ data class CommuteRoutineEntity(
     val destinationLat: Double,
     val destinationLng: Double,
     val destinationName: String,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val isNotificationEnabled: Boolean = true,
+    val isPriorityAlert: Boolean = false,
+    val notificationOffsetMins: Int = 15,
+    val notificationCount: Int = 1
 )
 
 @Entity(tableName = "traffic_snapshots")
@@ -86,7 +90,7 @@ interface TrafficSnapshotDao {
 
 @Database(
     entities = [CommuteRoutineEntity::class, TrafficSnapshotEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class CommuteDatabase : RoomDatabase() {

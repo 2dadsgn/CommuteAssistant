@@ -16,7 +16,11 @@ data class CommuteRoutine(
     val destinationLat: Double,
     val destinationLng: Double,
     val destinationName: String,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val isNotificationEnabled: Boolean = true,
+    val isPriorityAlert: Boolean = false,
+    val notificationOffsetMins: Int = 15,
+    val notificationCount: Int = 1
 )
 
 /**

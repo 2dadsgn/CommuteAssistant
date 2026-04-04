@@ -66,7 +66,11 @@ class CommuteRepository @Inject constructor(
         destinationLat = destinationLat,
         destinationLng = destinationLng,
         destinationName = destinationName,
-        isActive = isActive
+        isActive = isActive,
+        isNotificationEnabled = isNotificationEnabled,
+        isPriorityAlert = isPriorityAlert,
+        notificationOffsetMins = notificationOffsetMins,
+        notificationCount = notificationCount
     )
 
     private fun CommuteRoutine.toEntity() = CommuteRoutineEntity(
@@ -80,7 +84,11 @@ class CommuteRepository @Inject constructor(
         destinationLat = destinationLat,
         destinationLng = destinationLng,
         destinationName = destinationName,
-        isActive = isActive
+        isActive = isActive,
+        isNotificationEnabled = isNotificationEnabled,
+        isPriorityAlert = isPriorityAlert,
+        notificationOffsetMins = notificationOffsetMins,
+        notificationCount = notificationCount
     )
 
     private fun TrafficSnapshotEntity.toDomain() = TrafficSnapshot(

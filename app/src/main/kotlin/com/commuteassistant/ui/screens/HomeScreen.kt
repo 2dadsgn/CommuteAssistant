@@ -135,7 +135,7 @@ private fun RoutineCard(
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    "Usual departure: ${routine.usualDepartureTime.format(timeFormatter)}",
+                    "Target arrival: ${routine.usualDepartureTime.format(timeFormatter)}",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

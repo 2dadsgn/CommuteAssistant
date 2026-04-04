@@ -33,13 +33,13 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(1) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `commute_routines` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `dayOfWeek` INTEGER NOT NULL, `usualDepartureHour` INTEGER NOT NULL, `usualDepartureMinute` INTEGER NOT NULL, `originLat` REAL NOT NULL, `originLng` REAL NOT NULL, `originName` TEXT NOT NULL, `destinationLat` REAL NOT NULL, `destinationLng` REAL NOT NULL, `destinationName` TEXT NOT NULL, `isActive` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `commute_routines` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `dayOfWeek` INTEGER NOT NULL, `usualDepartureHour` INTEGER NOT NULL, `usualDepartureMinute` INTEGER NOT NULL, `originLat` REAL NOT NULL, `originLng` REAL NOT NULL, `originName` TEXT NOT NULL, `destinationLat` REAL NOT NULL, `destinationLng` REAL NOT NULL, `destinationName` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `isNotificationEnabled` INTEGER NOT NULL, `isPriorityAlert` INTEGER NOT NULL, `notificationOffsetMins` INTEGER NOT NULL, `notificationCount` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `traffic_snapshots` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `routineId` INTEGER NOT NULL, `capturedAt` INTEGER NOT NULL, `durationMinutes` INTEGER NOT NULL, `normalDurationMinutes` INTEGER NOT NULL, `congestionLevel` TEXT NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '53d7e02382ddbc2bde9709e1ebdf82e2')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '90db77a5a56bc7be9b2c9a184e0e684d')");
       }
 
       @Override
@@ -89,7 +89,7 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsCommuteRoutines = new HashMap<String, TableInfo.Column>(11);
+        final HashMap<String, TableInfo.Column> _columnsCommuteRoutines = new HashMap<String, TableInfo.Column>(15);
         _columnsCommuteRoutines.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCommuteRoutines.put("dayOfWeek", new TableInfo.Column("dayOfWeek", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCommuteRoutines.put("usualDepartureHour", new TableInfo.Column("usualDepartureHour", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -101,6 +101,10 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
         _columnsCommuteRoutines.put("destinationLng", new TableInfo.Column("destinationLng", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCommuteRoutines.put("destinationName", new TableInfo.Column("destinationName", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCommuteRoutines.put("isActive", new TableInfo.Column("isActive", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCommuteRoutines.put("isNotificationEnabled", new TableInfo.Column("isNotificationEnabled", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCommuteRoutines.put("isPriorityAlert", new TableInfo.Column("isPriorityAlert", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCommuteRoutines.put("notificationOffsetMins", new TableInfo.Column("notificationOffsetMins", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCommuteRoutines.put("notificationCount", new TableInfo.Column("notificationCount", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysCommuteRoutines = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesCommuteRoutines = new HashSet<TableInfo.Index>(0);
         final TableInfo _infoCommuteRoutines = new TableInfo("commute_routines", _columnsCommuteRoutines, _foreignKeysCommuteRoutines, _indicesCommuteRoutines);
@@ -128,7 +132,7 @@ public final class CommuteDatabase_Impl extends CommuteDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "53d7e02382ddbc2bde9709e1ebdf82e2", "d7d2791679081cf694ea020940fca06e");
+    }, "90db77a5a56bc7be9b2c9a184e0e684d", "252d0ed1448511d9d9aa6533e2e36315");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

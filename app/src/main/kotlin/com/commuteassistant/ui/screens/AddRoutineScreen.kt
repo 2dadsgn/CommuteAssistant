@@ -1,109 +1,235 @@
 package com.commuteassistant.ui.screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.commuteassistant.data.Prediction
 import com.commuteassistant.viewmodel.RoutineFormViewModel
 import java.time.DayOfWeek
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddRoutineScreen(
-    onBack: () -> Unit,
-    viewModel: RoutineFormViewModel = hiltViewModel()
-) {
+fun AddRoutineScreen(onBack: () -> Unit, viewModel: RoutineFormViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
+
+    // ── Permission launcher ───────────────────────────────────────────────────
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) viewModel.useCurrentLocationAsOrigin()
+    }
 
     // Navigate back when saved
     LaunchedEffect(state.saved) {
-        if (state.saved) onBack()
+        if (state.saved) {
+            onBack()
+        }
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Add Commute Route") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
+            topBar = {
+                TopAppBar(
+                        title = { Text("Add Commute Route") },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back"
+                                )
+                            }
+                        }
+                )
+            }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier =
+                        Modifier.fillMaxSize()
+                                .padding(padding)
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
             // ── Origin ────────────────────────────────────────────────────────
             SectionHeader("Starting Point")
-            OutlinedTextField(
-                value = state.originName,
-                onValueChange = { viewModel.updateOrigin(it, state.originLat, state.originLng) },
-                label = { Text("Home / Origin address") },
-                leadingIcon = { Icon(Icons.Default.Home, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            // Placeholder for map picker — wire up Maps SDK here
-            CoordinateRow(
-                lat = state.originLat, lng = state.originLng,
-                onLatChange = { viewModel.updateOrigin(state.originName, it, state.originLng) },
-                onLngChange = { viewModel.updateOrigin(state.originName, state.originLat, it) }
-            )
+            Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+            ) {
+                AutocompleteTextField(
+                        query = state.originName,
+                        onQueryChange = viewModel::onOriginSearchChange,
+                        suggestions = state.originSuggestions,
+                        onSuggestionSelected = viewModel::onOriginSelected,
+                        label = "Home / Origin address",
+                        leadingIcon = Icons.Default.Home,
+                        modifier = Modifier.weight(1f)
+                )
+
+                // Current location button
+                IconButton(
+                        onClick = {
+                            locationPermissionLauncher.launch(
+                                    Manifest.permission.ACCESS_FINE_LOCATION
+                            )
+                        },
+                        enabled = !state.isLoadingLocation
+                ) {
+                    if (state.isLoadingLocation) {
+                        CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = "Use current location",
+                                tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            // Show error if any
+            state.locationError?.let {
+                Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             // ── Destination ───────────────────────────────────────────────────
             SectionHeader("Destination")
-            OutlinedTextField(
-                value = state.destinationName,
-                onValueChange = { viewModel.updateDestination(it, state.destinationLat, state.destinationLng) },
-                label = { Text("Work / Destination address") },
-                leadingIcon = { Icon(Icons.Default.Work, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            CoordinateRow(
-                lat = state.destinationLat, lng = state.destinationLng,
-                onLatChange = { viewModel.updateDestination(state.destinationName, it, state.destinationLng) },
-                onLngChange = { viewModel.updateDestination(state.destinationName, state.destinationLat, it) }
+            AutocompleteTextField(
+                    query = state.destinationName,
+                    onQueryChange = viewModel::onDestinationSearchChange,
+                    suggestions = state.destinationSuggestions,
+                    onSuggestionSelected = viewModel::onDestinationSelected,
+                    label = "Work / Destination address",
+                    leadingIcon = Icons.Default.Work
             )
 
             // ── Day picker ────────────────────────────────────────────────────
-            SectionHeader("Day of Week") //todo possibility to pick more than one day
-            DayPicker(selected = state.selectedDay, onSelect = { viewModel.updateDay(it) })
+            SectionHeader("When")
+            DayPicker(selected = state.selectedDay, onSelect = viewModel::updateDay)
+
+            Spacer(Modifier.height(16.dp))
 
             // ── Time picker ───────────────────────────────────────────────────
-            SectionHeader("Usual Departure Time") //TODO: change this to desired arrival time
+            SectionHeader("Desired time of arrival")
             TimePicker(
-                hour = state.departureHour,
-                minute = state.departureMinute,
-                onTimeChange = viewModel::updateTime
+                    hour = state.departureHour,
+                    minute = state.departureMinute,
+                    onTimeChange = viewModel::updateTime
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Notification Settings ─────────────────────────────────────────
+            SectionHeader("Notification Settings")
+            Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Enable Notifications", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                            "Get active traffic updates",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                        checked = state.isNotificationEnabled,
+                        onCheckedChange = viewModel::updateNotificationEnabled
+                )
+            }
+
+            if (state.isNotificationEnabled) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                        "Send traffic updates every ${state.notificationOffsetMins} minutes",
+                        style = MaterialTheme.typography.bodyMedium
+                )
+                Slider(
+                        value = state.notificationOffsetMins.toFloat(),
+                        onValueChange = { viewModel.updateNotificationOffset(it.toInt()) },
+                        valueRange = 15f..60f,
+                        steps = 2
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
+            // ── ETA Display ───────────────────────────────────────────────────
+            if (state.isEtaLoading) {
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Calculating ETA...", style = MaterialTheme.typography.bodyMedium)
+                }
+            } else if (state.etaText != null) {
+                Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                                CardDefaults.cardColors(
+                                        containerColor =
+                                                MaterialTheme.colorScheme.secondaryContainer
+                                )
+                ) {
+                    Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.DirectionsCar, contentDescription = "ETA")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                                "Approximate ETA: ${state.etaText}",
+                                style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+            }
+
             // ── Save ──────────────────────────────────────────────────────────
             Button(
-                onClick = { viewModel.save() },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled = !state.isSaving && state.originName.isNotBlank() && state.destinationName.isNotBlank()
+                    onClick = { viewModel.save() },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled =
+                            !state.isSaving &&
+                                    state.originName.isNotBlank() &&
+                                    state.destinationName.isNotBlank() &&
+                                    state.originLat != 0.0 &&
+                                    state.destinationLat != 0.0
             ) {
                 if (state.isSaving) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary)
+                    CircularProgressIndicator(
+                            Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                    )
                 } else {
                     Icon(Icons.Default.Save, null)
                     Spacer(Modifier.width(8.dp))
@@ -116,51 +242,86 @@ fun AddRoutineScreen(
 
 @Composable
 private fun SectionHeader(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    Text(
+            text,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary
+    )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CoordinateRow(
-    lat: Double, lng: Double,
-    onLatChange: (Double) -> Unit,
-    onLngChange: (Double) -> Unit
+fun AutocompleteTextField(
+        query: String,
+        onQueryChange: (String) -> Unit,
+        suggestions: List<Prediction>,
+        onSuggestionSelected: (Prediction) -> Unit,
+        label: String,
+        leadingIcon: ImageVector,
+        modifier: Modifier = Modifier
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    var expanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(suggestions) { expanded = suggestions.isNotEmpty() }
+
+    Column(modifier = modifier) {
         OutlinedTextField(
-            value = if (lat == 0.0) "" else lat.toString(),
-            onValueChange = { onLatChange(it.toDoubleOrNull() ?: 0.0) },
-            label = { Text("Lat") },
-            modifier = Modifier.weight(1f),
-            singleLine = true
+                value = query,
+                onValueChange = {
+                    onQueryChange(it)
+                    expanded = true
+                },
+                label = { Text(label) },
+                leadingIcon = { Icon(leadingIcon, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
         )
-        OutlinedTextField(
-            value = if (lng == 0.0) "" else lng.toString(),
-            onValueChange = { onLngChange(it.toDoubleOrNull() ?: 0.0) },
-            label = { Text("Lng") },
-            modifier = Modifier.weight(1f),
-            singleLine = true
-        )
+
+        AnimatedVisibility(visible = expanded && suggestions.isNotEmpty()) {
+            Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape =
+                            androidx.compose.foundation.shape.RoundedCornerShape(
+                                    bottomStart = 8.dp,
+                                    bottomEnd = 8.dp
+                            )
+            ) {
+                Column {
+                    suggestions.forEach { prediction ->
+                        ListItem(
+                                headlineContent = {
+                                    Text(
+                                            prediction.description,
+                                            maxLines = 1,
+                                            overflow =
+                                                    androidx.compose.ui.text.style.TextOverflow
+                                                            .Ellipsis
+                                    )
+                                },
+                                modifier =
+                                        Modifier.clickable {
+                                            onSuggestionSelected(prediction)
+                                            expanded = false
+                                        }
+                        )
+                    }
+                }
+            }
+        }
     }
-    Text(
-        "💡 Tip: long-press on Google Maps to copy coordinates",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-    )
 }
 
 @Composable
 private fun DayPicker(selected: DayOfWeek, onSelect: (DayOfWeek) -> Unit) {
     val days = DayOfWeek.values()
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         days.forEach { day ->
             FilterChip(
-                selected = day == selected,
-                onClick = { onSelect(day) },
-                label = { Text(day.name.take(2)) },
-                modifier = Modifier.weight(1f)
+                    selected = day == selected,
+                    onClick = { onSelect(day) },
+                    label = { Text(day.name.take(2)) },
+                    modifier = Modifier.weight(1f)
             )
         }
     }
@@ -169,9 +330,9 @@ private fun DayPicker(selected: DayOfWeek, onSelect: (DayOfWeek) -> Unit) {
 @Composable
 private fun TimePicker(hour: Int, minute: Int, onTimeChange: (Int, Int) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
     ) {
         // Hour
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -180,8 +341,10 @@ private fun TimePicker(hour: Int, minute: Int, onTimeChange: (Int, Int) -> Unit)
                 IconButton(onClick = { onTimeChange((hour - 1 + 24) % 24, minute) }) {
                     Icon(Icons.Default.Remove, null)
                 }
-                Text(hour.toString().padStart(2, '0'),
-                    style = MaterialTheme.typography.headlineMedium)
+                Text(
+                        hour.toString().padStart(2, '0'),
+                        style = MaterialTheme.typography.headlineMedium
+                )
                 IconButton(onClick = { onTimeChange((hour + 1) % 24, minute) }) {
                     Icon(Icons.Default.Add, null)
                 }
@@ -195,8 +358,10 @@ private fun TimePicker(hour: Int, minute: Int, onTimeChange: (Int, Int) -> Unit)
                 IconButton(onClick = { onTimeChange(hour, (minute - 5 + 60) % 60) }) {
                     Icon(Icons.Default.Remove, null)
                 }
-                Text(minute.toString().padStart(2, '0'),
-                    style = MaterialTheme.typography.headlineMedium)
+                Text(
+                        minute.toString().padStart(2, '0'),
+                        style = MaterialTheme.typography.headlineMedium
+                )
                 IconButton(onClick = { onTimeChange(hour, (minute + 5) % 60) }) {
                     Icon(Icons.Default.Add, null)
                 }
