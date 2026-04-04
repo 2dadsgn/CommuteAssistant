@@ -26,7 +26,7 @@ android {
         if (localPropertiesFile.exists()) {
             localProperties.load(localPropertiesFile.inputStream())
         }
-        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
+        manifestPlaceholders["TOMTOM_API_KEY"] = localProperties.getProperty("TOMTOM_API_KEY") ?: ""
     }
 
     buildTypes {
@@ -81,8 +81,6 @@ dependencies {
     ksp(libs.hilt.work.compiler)
 
     // Maps & Location
-    implementation(libs.maps.compose)
-    implementation(libs.play.services.maps)
     implementation(libs.play.services.location)
     implementation(libs.kotlinx.coroutines.play.services)
 
