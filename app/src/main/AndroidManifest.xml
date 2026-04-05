@@ -32,10 +32,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Google Maps API Key -->
+        <!-- TomTom API Key -->
         <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
+            android:name="com.tomtom.api.KEY"
+            android:value="${TOMTOM_API_KEY}" />
 
         <!-- WorkManager -->
         <provider
