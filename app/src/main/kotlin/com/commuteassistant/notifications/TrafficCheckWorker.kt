@@ -12,7 +12,6 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.commuteassistant.MainActivity
 import com.commuteassistant.R
-import com.commuteassistant.data.GoogleMapsApiService
 import com.commuteassistant.data.ApiKeyProvider
 import com.commuteassistant.data.repository.CommuteRepository
 import com.commuteassistant.domain.usecase.GetDepartureRecommendationUseCase

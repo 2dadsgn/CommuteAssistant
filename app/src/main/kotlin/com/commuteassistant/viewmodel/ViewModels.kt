@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.commuteassistant.data.repository.CommuteRepository
 import com.commuteassistant.domain.model.*
 import com.commuteassistant.domain.usecase.GetDepartureRecommendationUseCase
-import com.commuteassistant.data.GoogleMapsApiService
+import com.commuteassistant.data.TomTomApiService
 import com.commuteassistant.data.ApiKeyProvider
 import com.commuteassistant.data.Prediction
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +22,9 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.util.Locale
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import com.commuteassistant.util.TimeUtils
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -100,7 +103,7 @@ data class RoutineFormState(
 @HiltViewModel
 class RoutineFormViewModel @Inject constructor(
     private val repository: CommuteRepository,
-    private val apiService: GoogleMapsApiService,
+    private val apiService: TomTomApiService,
     private val apiKeyProvider: ApiKeyProvider,
     private val notificationScheduler: com.commuteassistant.notifications.NotificationScheduler,
     @ApplicationContext private val context: Context
@@ -130,10 +133,17 @@ class RoutineFormViewModel @Inject constructor(
         viewModelScope.launch {
             delay(300) // debounce
             try {
-                val key = apiKeyProvider.getMapsApiKey()
+                val key = apiKeyProvider.getTomTomApiKey()
                 if (key.isNotEmpty()) {
-                    val response = apiService.getPlaceAutocomplete(input = query, apiKey = key)
-                    val predictions = response.predictions ?: emptyList()
+                    val response = apiService.fuzzySearch(query = query, apiKey = key)
+                    val predictions = response.results?.map { result ->
+                        Prediction(
+                            description = result.address?.freeformAddress ?: "",
+                            placeId = result.id,
+                            lat = result.position?.lat,
+                            lng = result.position?.lon
+                        )
+                    } ?: emptyList()
                     _state.update {
                         if (isOrigin) it.copy(originSuggestions = predictions)
                         else it.copy(destinationSuggestions = predictions)
@@ -146,35 +156,30 @@ class RoutineFormViewModel @Inject constructor(
     }
 
     fun onOriginSelected(prediction: Prediction) {
-        _state.update { it.copy(originName = prediction.description, originSuggestions = emptyList()) }
-        fetchPlaceDetails(prediction.placeId, isOrigin = true)
+        _state.update { 
+            it.copy(
+                originName = prediction.description, 
+                originLat = prediction.lat ?: 0.0,
+                originLng = prediction.lng ?: 0.0,
+                originSuggestions = emptyList()
+            ) 
+        }
+        calculateEta()
     }
 
     fun onDestinationSelected(prediction: Prediction) {
-        _state.update { it.copy(destinationName = prediction.description, destinationSuggestions = emptyList()) }
-        fetchPlaceDetails(prediction.placeId, isOrigin = false)
+        _state.update { 
+            it.copy(
+                destinationName = prediction.description, 
+                destinationLat = prediction.lat ?: 0.0,
+                destinationLng = prediction.lng ?: 0.0,
+                destinationSuggestions = emptyList()
+            ) 
+        }
+        calculateEta()
     }
 
-    private fun fetchPlaceDetails(placeId: String, isOrigin: Boolean) {
-        viewModelScope.launch {
-            try {
-                val key = apiKeyProvider.getMapsApiKey()
-                if (key.isNotEmpty()) {
-                    val response = apiService.getPlaceDetails(placeId, key)
-                    val location = response.result?.geometry?.location
-                    if (location != null) {
-                        _state.update {
-                            if (isOrigin) it.copy(originLat = location.lat, originLng = location.lng)
-                            else it.copy(destinationLat = location.lat, destinationLng = location.lng)
-                        }
-                        calculateEta()
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore or log
-            }
-        }
-    }
+    // fetchPlaceDetails is no longer needed as TomTom fuzzy search returns positions directly.
 
     // ── Current Location ──────────────────────────────────────────────────────
 
@@ -230,15 +235,24 @@ class RoutineFormViewModel @Inject constructor(
             viewModelScope.launch {
                 _state.update { it.copy(isEtaLoading = true) }
                 try {
-                    val key = apiKeyProvider.getMapsApiKey()
+                    val key = apiKeyProvider.getTomTomApiKey()
                     if (key.isNotEmpty()) {
-                        val response = apiService.getDirections(
-                            origin = "${s.originLat},${s.originLng}",
-                            destination = "${s.destinationLat},${s.destinationLng}",
-                            apiKey = key
+                        val locations = "${s.originLat},${s.originLng}:${s.destinationLat},${s.destinationLng}"
+                        
+                        val nextOccurrence = TimeUtils.calculateNextOccurrence(
+                            s.selectedDay, 
+                            LocalTime.of(s.departureHour, s.departureMinute)
                         )
-                        val text = response.routes?.firstOrNull()?.legs?.firstOrNull()?.durationInTraffic?.text
-                            ?: response.routes?.firstOrNull()?.legs?.firstOrNull()?.duration?.text
+                        val arriveAtIso = nextOccurrence.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+
+                        val response = apiService.calculateRoute(
+                            locations = locations,
+                            apiKey = key,
+                            arriveAt = arriveAtIso
+                        )
+                        val summary = response.routes?.firstOrNull()?.summary
+                        val minutes = summary?.travelTimeInSeconds?.let { it / 60 }
+                        val text = minutes?.let { "${it} min" } ?: "N/A"
                         _state.update { it.copy(etaText = text, isEtaLoading = false) }
                     } else {
                         _state.update { it.copy(isEtaLoading = false) }

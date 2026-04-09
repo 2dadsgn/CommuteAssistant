@@ -58,7 +58,8 @@ interface TomTomApiService {
         @Path("locations") locations: String, // format: "lat,lon:lat,lon"
         @Query("key") apiKey: String,
         @Query("traffic") traffic: Boolean = true,
-        @Query("departureTime") departureTime: String = "now"
+        @Query("departureTime") departureTime: String? = null,
+        @Query("arriveAt") arriveAt: String? = null
     ): TomTomRoutingResponse
 
     @GET("search/2/search/{query}.json")

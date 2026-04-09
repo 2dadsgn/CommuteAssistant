@@ -2,10 +2,14 @@ package com.commuteassistant.domain.usecase
 
 import com.commuteassistant.data.repository.CommuteRepository
 import com.commuteassistant.domain.model.*
-import com.commuteassistant.data.GoogleMapsApiService
+import com.commuteassistant.data.TomTomApiService
 import com.commuteassistant.data.ApiKeyProvider
 import android.util.Log
 import java.time.LocalTime
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.DayOfWeek
+import com.commuteassistant.util.TimeUtils
 import javax.inject.Inject
 
 /**
@@ -20,7 +24,7 @@ import javax.inject.Inject
  */
 class GetDepartureRecommendationUseCase @Inject constructor(
     private val repository: CommuteRepository,
-    private val apiService: GoogleMapsApiService,
+    private val apiService: TomTomApiService,
     private val apiKeyProvider: ApiKeyProvider
 ) {
     companion object {
@@ -37,19 +41,28 @@ class GetDepartureRecommendationUseCase @Inject constructor(
         var liveTrafficMinutes: Int? = null
         var normalDurationMinutes: Int? = null
         try {
-            val key = apiKeyProvider.getMapsApiKey()
+            val key = apiKeyProvider.getTomTomApiKey()
             if (key.isNotEmpty()) {
-                val response = apiService.getDirections(
-                    origin = "${routine.originLat},${routine.originLng}",
-                    destination = "${routine.destinationLat},${routine.destinationLng}",
-                    apiKey = key
+                val locations = "${routine.originLat},${routine.originLng}:${routine.destinationLat},${routine.destinationLng}"
+                
+                // Calculate next occurrence for "Arrival Prediction"
+                val nextOccurrence = TimeUtils.calculateNextOccurrence(routine.dayOfWeek, routine.usualDepartureTime)
+                val arriveAtIso = nextOccurrence.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+
+                val response = apiService.calculateRoute(
+                    locations = locations,
+                    apiKey = key,
+                    arriveAt = arriveAtIso
                 )
-                val leg = response.routes?.firstOrNull()?.legs?.firstOrNull()
-                liveTrafficMinutes = leg?.durationInTraffic?.value?.let { (it / 60).toInt() }
-                normalDurationMinutes = leg?.duration?.value?.let { (it / 60).toInt() }
+                
+                val summary = response.routes?.firstOrNull()?.summary
+                liveTrafficMinutes = summary?.travelTimeInSeconds?.let { it / 60 }
+                // TomTom's travelTimeInSeconds includes traffic (predicted/historical if in future). 
+                // To get "normal" duration, we subtract traffic delay.
+                normalDurationMinutes = summary?.let { (it.travelTimeInSeconds - it.trafficDelayInSeconds) / 60 }
             }
         } catch (e: Exception) {
-            Log.e("TrafficCheck", "Failed to fetch directions", e)
+            Log.e("TrafficCheck", "Failed to fetch TomTom directions", e)
         }
 
         val baseMinutes = normalDurationMinutes ?: avgHistorical?.toInt() ?: 30
@@ -95,7 +108,7 @@ class GetDepartureRecommendationUseCase @Inject constructor(
         }
 
         val dataPointsText = if (liveTrafficMinutes != null) {
-            "Live traffic data from Google Maps."
+            "Predictive traffic data from TomTom."
         } else if (recentSnapshots.size > 0) {
             "Based on ${recentSnapshots.size} recent trips."
         } else {
