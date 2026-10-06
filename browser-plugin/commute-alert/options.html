@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Commute Alert settings</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  header { padding: 22px 24px 20px; }
+  header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+  header p { margin: 4px 0 0; color: #C9CED2; max-width: 60ch; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px; display: grid; gap: 22px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; max-width: 70ch; }
+  .route { border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 16px; display: grid; gap: 14px; }
+  .route-head { display: flex; gap: 12px; align-items: center; }
+  .route-head input[data-f="name"] { font-size: 16px; font-weight: 600; }
+  label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+  label.inline { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 13px; white-space: nowrap; }
+  label.inline input { width: auto; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* address suggestions */
+  .ac { position: relative; }
+  .ac ul { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 3px); margin: 0; padding: 4px; list-style: none;
+           background: var(--field); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); max-height: 260px; overflow: auto; }
+  .ac li { padding: 7px 9px; border-radius: 5px; cursor: pointer; color: var(--ink); font-size: 13px; }
+  .ac li small { display: block; color: var(--muted); font-size: 11.5px; }
+  .ac li[aria-selected="true"], .ac li:hover { background: var(--asphalt); color: #fff; }
+  .ac li[aria-selected="true"] small, .ac li:hover small { color: #C9CED2; }
+  .ac .pin { position: absolute; right: 9px; top: 8px; font-size: 12px; color: var(--go); pointer-events: none; }
+
+  /* mode switch */
+  .mode { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; }
+  .mode label { display: block; }
+  .mode input { position: absolute; opacity: 0; width: 1px; }
+  .mode span { display: block; padding: 7px 14px; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .mode input:checked + span { background: var(--asphalt); color: #fff; }
+  .mode input:focus-visible + span { outline: 2px solid var(--lane); outline-offset: -2px; }
+  .route[data-mode="watch"] .arrive-only, .route[data-mode="arrive"] .watch-only { display: none; }
+  .window { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .window input[type="time"] { width: 120px; }
+  .window input:disabled { opacity: .45; }
+
+  .days { display: flex; gap: 6px; flex-wrap: wrap; }
+  .days label { display: block; }
+  .days input { position: absolute; opacity: 0; width: 1px; }
+  .days span { display: inline-block; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font-size: 13px; cursor: pointer; }
+  .days input:checked + span { background: var(--asphalt); border-color: var(--asphalt); color: #fff; }
+  .days input:focus-visible + span { outline: 2px solid var(--lane); outline-offset: 2px; }
+  details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  details .grid { margin-top: 10px; grid-template-columns: repeat(3, 1fr); }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .out { font-size: 13px; }
+  .out.bad { color: var(--stop); }
+  .bar { position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--line); padding: 12px 24px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+  #saved { color: var(--go); font-size: 13px; }
+  @media (max-width: 620px) { .grid, details .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <header class="road">
+    <h1>Commute Alert</h1>
+    <p>Know when to leave, or just keep an eye on traffic, using live Google Maps travel times.</p>
+  </header>
+  <main>
+    <section>
+      <h2>How it works</h2>
+      <p class="hint">When a check is due, Commute Alert opens your route on Google Maps in a minimized window for a few seconds, reads the travel time, and closes it. If Google asks you about cookies, open google.com/maps once and make your choice.</p>
+    </section>
+    <section>
+      <h2>Your routes</h2>
+      <div id="routes" style="display:grid;gap:14px"></div>
+      <p style="margin-top:12px"><button id="add">Add route</button></p>
+    </section>
+  </main>
+  <div class="bar">
+    <span id="saved"></span>
+    <button id="save" class="primary">Save changes</button>
+  </div>
+
+  <template id="tpl">
+    <div class="route">
+      <div class="route-head">
+        <input data-f="name" placeholder="Route name, e.g. Work to home" aria-label="Route name">
+        <label class="inline"><input type="checkbox" data-f="enabled"> Alerts on</label>
+      </div>
+      <div class="grid">
+        <label>From<div class="ac"><input data-ac="origin" placeholder="Start typing an address or place" autocomplete="off"></div></label>
+        <label>To<div class="ac"><input data-ac="destination" placeholder="Start typing an address or place" autocomplete="off"></div></label>
+      </div>
+
+      <div class="mode" role="radiogroup" aria-label="What should this route do">
+        <label><input type="radio" value="arrive"><span>Tell me when to leave</span></label>
+        <label><input type="radio" value="watch"><span>Just send traffic updates</span></label>
+      </div>
+
+      <label class="arrive-only" style="max-width:220px">Arrive by<input type="time" data-f="arriveBy"></label>
+
+      <div class="watch-only grid">
+        <label>Send an update every (min)<input type="number" min="5" max="180" data-f="updateEveryMin"></label>
+        <label>Notify me
+          <select data-f="notifyMode">
+            <option value="always">At every update</option>
+            <option value="change">Only when the travel time changes</option>
+          </select>
+        </label>
+        <div class="window" style="grid-column:1/-1">
+          <label class="inline"><input type="checkbox" data-f="useWindow"> Only between</label>
+          <input type="time" data-f="windowStart" aria-label="From time">
+          <span>and</span>
+          <input type="time" data-f="windowEnd" aria-label="Until time">
+        </div>
+        <p class="hint" style="grid-column:1/-1;margin:0">Without a time range, updates arrive all day on the selected days while your browser is open.</p>
+      </div>
+
+      <div class="days"></div>
+
+      <details>
+        <summary>More options</summary>
+        <div class="grid">
+          <label class="arrive-only">Safety margin (min)<input type="number" min="0" max="60" data-f="bufferMin"></label>
+          <label class="arrive-only">Remind me before leaving (min)<input type="number" min="0" max="120" data-f="reminderLeadMin"></label>
+          <label class="arrive-only">Start watching before arrival (min)<input type="number" min="30" max="360" data-f="monitorStartMin"></label>
+          <label class="arrive-only">Check traffic every (min)<input type="number" min="5" max="60" data-f="checkEveryMin"></label>
+          <label>Count it as a change at (min)<input type="number" min="1" max="60" data-f="changeThresholdMin"></label>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button class="test">Save and test</button>
+        <button class="reverse">Add return trip</button>
+        <button class="danger del">Delete</button>
+        <span class="out"></span>
+      </div>
+    </div>
+  </template>
+  <script src="options.js"></script>
+</body>
+</html>

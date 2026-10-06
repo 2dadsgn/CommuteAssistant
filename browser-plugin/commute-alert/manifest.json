@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Commute Alert",
+  "version": "2.1.0",
+  "description": "Reads live traffic from Google Maps for your regular routes and tells you when to leave to arrive on time. No API key needed.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.google.com/*",
+    "https://consent.google.com/*",
+    "https://photon.komoot.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Commute Alert",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "commute-alert@example.com",
+      "strict_min_version": "121.0"
+    }
+  }
+}
