@@ -4,7 +4,7 @@ Watches your regular routes (e.g. work to home) using the travel time Google Map
 and tells you the latest time you can leave to arrive by a set time.
 
 ## How it works
-Around each trip, the extension opens your route on google.com/maps in a **minimized window**
+Around each trip, the extension opens your route on google.com/maps in a **hidden tab (Firefox) or minimized window (Chrome)**
 for a few seconds, reads the travel time and traffic colour, then closes it.
 No API key, no account, no cost.
 
@@ -20,7 +20,7 @@ range (e.g. 17:00–19:00) and choose to be notified only when the travel time c
 Use **Pause / Resume** in the popup to turn a route's alerts on and off quickly.
 
 ## Address suggestions
-From and To suggest places as you type, using Photon (free, OpenStreetMap-based, no key).
+From and To suggest places as you type, using Photon (free, OpenStreetMap-based, no key). In Firefox, click **Allow** in the suggestion box the first time. If nothing matches, press Enter to search OpenStreetMap more widely.
 Picking a suggestion saves its exact coordinates (a green tick appears), and those are sent to
 Google Maps, so the right place is always measured. If you type an address without picking
 a suggestion, Google Maps interprets the text itself.

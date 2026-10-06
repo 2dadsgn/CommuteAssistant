@@ -27,7 +27,15 @@
   .ac li small { display: block; color: var(--muted); font-size: 11.5px; }
   .ac li[aria-selected="true"], .ac li:hover { background: var(--asphalt); color: #fff; }
   .ac li[aria-selected="true"] small, .ac li:hover small { color: #C9CED2; }
-  .ac .pin { position: absolute; right: 9px; top: 8px; font-size: 12px; color: var(--go); pointer-events: none; }
+  .ac li.status { cursor: default; color: var(--muted); }
+  .ac li.status:hover { background: none; color: var(--muted); }
+  .ac li.status button { margin-left: 4px; padding: 3px 10px; font-size: 12px; }
+  .ac input { padding-right: 60px; }
+  .ac .pin { position: absolute; right: 38px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--go); pointer-events: none; }
+  .ac .locate { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 5px; line-height: 0;
+                border: 0; background: transparent; color: var(--muted); border-radius: 5px; }
+  .ac .locate:hover { color: var(--ink); background: var(--paper); }
+  .ac .locate:disabled { cursor: progress; }
 
   /* mode switch */
   .mode { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; }
@@ -59,13 +67,18 @@
 </head>
 <body>
   <header class="road">
-    <h1>Commute Alert</h1>
+    <h1>Commute Alert <small id="ver" style="font-size:12px;font-weight:400;color:#C9CED2"></small></h1>
     <p>Know when to leave, or just keep an eye on traffic, using live Google Maps travel times.</p>
   </header>
   <main>
     <section>
       <h2>How it works</h2>
       <p class="hint">When a check is due, Commute Alert opens your route on Google Maps in a minimized window for a few seconds, reads the travel time, and closes it. If Google asks you about cookies, open google.com/maps once and make your choice.</p>
+    </section>
+    <section>
+      <h2>Notifications</h2>
+      <p class="hint">Not seeing alerts? Send a test. If nothing appears, allow notifications for your browser in Windows Settings > System > Notifications, and turn off Do not disturb.</p>
+      <p style="margin:10px 0 0;display:flex;gap:10px;align-items:center"><button id="testNotify">Send a test notification</button><span id="notifyOut" class="hint" style="margin:0"></span></p>
     </section>
     <section>
       <h2>Your routes</h2>

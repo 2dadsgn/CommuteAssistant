@@ -133,18 +133,26 @@ function waitForMapsLoad(tabId, timeout) {
   });
 }
 
-async function readGoogleMaps(route) {
+async function readGoogleMaps(route, { fromPopup = false } = {}) {
   const url = readUrl(route);
   let windowId = null;
   let tabId = null;
   try {
-    try {
-      const win = await api.windows.create({ url, state: "minimized" });
-      windowId = win.id;
-      tabId = win.tabs?.[0]?.id ?? (await api.tabs.query({ windowId }))[0]?.id;
-    } catch {
+    const canHide = typeof api.tabs.hide === "function"; // Firefox only
+    if (canHide || fromPopup) {
+      // A background tab doesn't take focus, so an open popup stays open.
       const tab = await api.tabs.create({ url, active: false });
       tabId = tab.id;
+      if (canHide) await api.tabs.hide(tabId).catch(() => {});
+    } else {
+      try {
+        const win = await api.windows.create({ url, state: "minimized" });
+        windowId = win.id;
+        tabId = win.tabs?.[0]?.id ?? (await api.tabs.query({ windowId }))[0]?.id;
+      } catch {
+        const tab = await api.tabs.create({ url, active: false });
+        tabId = tab.id;
+      }
     }
     await waitForMapsLoad(tabId, 20000);
 
@@ -173,9 +181,9 @@ async function readGoogleMaps(route) {
 }
 
 /** Current travel time plus how it compares with the usual (fastest seen) time. */
-async function measureTrip(route) {
+async function measureTrip(route, opts) {
   const now = Date.now();
-  const trip = await readGoogleMaps(route);
+  const trip = await readGoogleMaps(route, opts);
   const key = `${place(route, "origin")}|${place(route, "destination")}`.trim().toLowerCase();
   const { baselines = {} } = await api.storage.local.get("baselines");
   if (!baselines[key] || trip.durationMin < baselines[key]) {
@@ -199,8 +207,8 @@ async function measureTrip(route) {
  * Latest departure that still arrives by (arrival - margin), using the current
  * travel time shown by Google Maps. Re-checked regularly, so it tracks traffic as it changes.
  */
-async function planDeparture(route, arrival) {
-  const m = await measureTrip(route);
+async function planDeparture(route, arrival, opts) {
+  const m = await measureTrip(route, opts);
   const arrivalMs = arrival.getTime();
   const target = arrivalMs - (route.bufferMin || 0) * MIN;
   const nowMin = Math.floor(m.computedAt / MIN) * MIN;
@@ -290,6 +298,18 @@ async function updateBadge(routes, state, now) {
   await api.action.setBadgeText({ text: left <= 0 ? "GO" : `${left}m` });
 }
 
+// Tell the person once when checks start failing, and once when they work again.
+function reportFailure(route, s) {
+  if (s.failNotified) return;
+  s.failNotified = true;
+  notify(route, `${route.name}: couldn't get traffic`, `${s.error} Commute Alert will keep trying.`);
+}
+function reportRecovery(route, s) {
+  if (!s.failNotified) return;
+  s.failNotified = false;
+  if (route.mode !== "watch") notify(route, `${route.name}: traffic checks working again`, "You'll get your leave-by alerts as usual.");
+}
+
 // ---------- traffic-update routes ----------
 function inWindow(route, d) {
   if (!route.useWindow) return true;
@@ -311,9 +331,11 @@ async function tickWatch(route, state, nowDate) {
   } catch (e) {
     s.error = String(e.message || e);
     s.lastCheck = Date.now();
+    reportFailure(route, s);
     return;
   }
   s.lastCheck = Date.now();
+  reportRecovery(route, s);
 
   const res = s.result;
   const threshold = route.changeThresholdMin ?? 5;
@@ -361,8 +383,10 @@ async function tick() {
     try {
       s.result = await planDeparture(route, new Date(arrival));
       s.error = null;
+      reportRecovery(route, s);
     } catch (e) {
       s.error = String(e.message || e);
+      reportFailure(route, s);
     }
     s.lastCheck = Date.now();
     maybeNotify(route, s, Date.now(), true);
@@ -376,30 +400,55 @@ async function tick() {
 }
 
 // ---------- messages from popup / settings ----------
+// Track whether the popup is open, so a manual check can still report back if it closed.
+let popupPorts = 0;
+api.runtime.onConnect.addListener((port) => {
+  if (port.name !== "popup") return;
+  popupPorts++;
+  port.onDisconnect.addListener(() => { popupPorts--; });
+});
+
 async function checkNow(routeId) {
   const { routes = [], state = {} } = await api.storage.local.get(["routes", "state"]);
   const route = routes.find((r) => r.id === routeId);
   if (!route) throw new Error("Route not found. Save your settings and try again.");
+  const s = (state[route.id] ||= {});
+  const opts = { fromPopup: true };
 
-  if (route.mode === "watch") {
-    const result = await measureTrip(route);
-    const s = (state[route.id] ||= {});
-    s.result = result;
+  try {
+    let result;
+    if (route.mode === "watch") {
+      result = await measureTrip(route, opts);
+      s.result = result;
+    } else {
+      result = await planDeparture(route, nextArrival(route), opts);
+      s.preview = result;
+      if (s.date === dateKey(new Date()) && s.result && s.result.arrival === result.arrival && !s.done) {
+        s.result = result;
+        s.lastCheck = Date.now();
+      }
+    }
     s.error = null;
     await api.storage.local.set({ state });
-    return result;
-  }
+    await updateBadge(routes, state, Date.now());
 
-  const result = await planDeparture(route, nextArrival(route));
-  const s = (state[route.id] ||= {});
-  s.preview = result;
-  if (s.date === dateKey(new Date()) && s.result && s.result.arrival === result.arrival && !s.done) {
-    s.result = result;
-    s.lastCheck = Date.now();
+    if (popupPorts === 0) {
+      const extra = result.extraMin > 1 ? ` (+${result.extraMin} min vs usual)` : "";
+      notify(route, route.mode === "watch"
+        ? `${route.name}: ${result.durationMin} min now`
+        : `${route.name}: leave by ${fmt(result.departAt)}`,
+        `${result.level[0].toUpperCase()}${result.level.slice(1)} traffic${extra}. ` +
+        (route.mode === "watch"
+          ? `Leave now to arrive about ${fmt(result.arrivalEstimate)}.`
+          : `${result.durationMin} min trip, arrive about ${fmt(result.arrivalEstimate)}.`));
+    }
+    return result;
+  } catch (e) {
+    s.error = String(e.message || e);
+    await api.storage.local.set({ state });
+    if (popupPorts === 0) notify(route, `${route.name}: traffic check failed`, s.error);
+    throw e;
   }
-  await api.storage.local.set({ state });
-  await updateBadge(routes, state, Date.now());
-  return result;
 }
 
 api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -409,6 +458,12 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (e) => sendResponse({ ok: false, error: String(e.message || e) })
     );
     return true;
+  }
+  if (msg?.type === "testNotification") {
+    notify({ id: "test", name: "Test" }, "Commute Alert notifications work",
+      "This is how traffic alerts will look. Click a real alert to open the route in Google Maps.");
+    sendResponse({ ok: true });
+    return false;
   }
   if (msg?.type === "routesChanged") {
     serial(async () => {

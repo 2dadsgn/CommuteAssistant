@@ -1,18 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Commute Alert",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "description": "Reads live traffic from Google Maps for your regular routes and tells you when to leave to arrive on time. No API key needed.",
   "permissions": [
     "storage",
     "alarms",
     "notifications",
-    "scripting"
+    "scripting",
+    "tabHide",
+    "geolocation"
   ],
   "host_permissions": [
     "https://www.google.com/*",
     "https://consent.google.com/*",
-    "https://photon.komoot.io/*"
+    "https://photon.komoot.io/*",
+    "https://nominatim.openstreetmap.org/*"
   ],
   "background": {
     "service_worker": "background.js",

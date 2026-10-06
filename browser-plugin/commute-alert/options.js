@@ -1,5 +1,5 @@
 const api = globalThis.browser ?? globalThis.chrome;
-const HOSTS = ["https://www.google.com/*", "https://consent.google.com/*", "https://photon.komoot.io/*"];
+const HOSTS = ["https://www.google.com/*", "https://consent.google.com/*", "https://photon.komoot.io/*", "https://nominatim.openstreetmap.org/*"];
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const NUMERIC = new Set(["bufferMin", "reminderLeadMin", "changeThresholdMin", "monitorStartMin", "checkEveryMin", "updateEveryMin"]);
@@ -43,13 +43,51 @@ function render() {
   routes.forEach((r) => container.append(card(r)));
 }
 
-// ---------- address suggestions (Photon / OpenStreetMap, no key) ----------
+// ---------- address suggestions ----------
+// As you type: Photon (OpenStreetMap, built for search-as-you-type, no key).
+// On Enter, or if Photon fails: one Nominatim search (OpenStreetMap; not allowed for as-you-type).
+const AC_HOSTS = ["https://photon.komoot.io/*", "https://nominatim.openstreetmap.org/*"];
+
+async function hasAcPermission() {
+  try { return await api.permissions.contains({ origins: AC_HOSTS }); } catch { return true; }
+}
+
 function labelFor(p) {
   const street = [p.street, p.housenumber].filter(Boolean).join(" ");
-  const main = p.name || street || p.city || "";
-  const rest = [p.name && street ? street : null, p.postcode, p.city !== main ? p.city : null, p.country]
+  const ownName = p.name && p.name !== p.street ? p.name : null; // a shop, building, etc.
+  const main = ownName || street || p.name || p.city || "";
+  const rest = [ownName && street ? street : null, p.postcode, p.city !== main ? p.city : null, p.country]
     .filter(Boolean);
   return { main, rest: [...new Set(rest)].join(", ") };
+}
+
+async function photonSearch(q, bias, signal) {
+  const params = new URLSearchParams({ q, limit: "6" });
+  if (bias) { params.set("lat", bias[0]); params.set("lon", bias[1]); }
+  const resp = await fetch(`https://photon.komoot.io/api/?${params}`, { signal });
+  if (!resp.ok) throw new Error(`address search answered ${resp.status}`);
+  const data = await resp.json();
+  return (data.features || []).map((f) => {
+    const { main, rest } = labelFor(f.properties || {});
+    const [lon, lat] = f.geometry.coordinates;
+    return { main, rest, text: [main, rest].filter(Boolean).join(", "), coords: [+lat.toFixed(6), +lon.toFixed(6)] };
+  }).filter((x) => x.main);
+}
+
+async function nominatimSearch(q, signal) {
+  const params = new URLSearchParams({ q, format: "jsonv2", limit: "6" });
+  const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { signal });
+  if (!resp.ok) throw new Error(`OpenStreetMap search answered ${resp.status}`);
+  const data = await resp.json();
+  return data.map((d) => {
+    const parts = String(d.display_name || "").split(", ");
+    return {
+      main: parts.slice(0, 2).join(", "),
+      rest: parts.slice(2).join(", "),
+      text: d.display_name,
+      coords: [+(+d.lat).toFixed(6), +(+d.lon).toFixed(6)],
+    };
+  });
 }
 
 function attachAutocomplete(input, route, field, otherField) {
@@ -58,11 +96,21 @@ function attachAutocomplete(input, route, field, otherField) {
   list.setAttribute("role", "listbox");
   list.id = `ac-${route.id}-${field}`;
   list.hidden = true;
+  list.addEventListener("mousedown", (ev) => ev.preventDefault()); // keep focus in the field
   const pin = document.createElement("span");
   pin.className = "pin";
   pin.textContent = "✓";
   pin.title = "Exact location saved";
   box.append(list, pin);
+
+  // "Use my current location" button
+  const locate = document.createElement("button");
+  locate.type = "button";
+  locate.className = "locate";
+  locate.title = "Use my current location";
+  locate.setAttribute("aria-label", "Use my current location");
+  locate.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+  box.append(locate);
 
   input.setAttribute("role", "combobox");
   input.setAttribute("aria-controls", list.id);
@@ -77,6 +125,7 @@ function attachAutocomplete(input, route, field, otherField) {
   const showPin = () => { pin.hidden = !route[`${field}Coords`]; };
   showPin();
 
+  const open = () => { list.hidden = false; input.setAttribute("aria-expanded", "true"); };
   const close = () => {
     list.hidden = true;
     input.setAttribute("aria-expanded", "false");
@@ -84,13 +133,46 @@ function attachAutocomplete(input, route, field, otherField) {
     active = -1;
   };
 
+  const status = (msg, action) => {
+    items = [];
+    active = -1;
+    list.textContent = "";
+    const li = document.createElement("li");
+    li.className = "status";
+    li.textContent = msg;
+    if (action) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = action.label;
+      b.addEventListener("click", action.onClick);
+      li.append(" ", b);
+    }
+    list.append(li);
+    open();
+  };
+
+  const showItems = (found, emptyMsg) => {
+    items = found;
+    if (!items.length) { status(emptyMsg); return; }
+    list.textContent = "";
+    items.forEach((it, i) => {
+      const li = document.createElement("li");
+      li.id = `${list.id}-${i}`;
+      li.setAttribute("role", "option");
+      li.textContent = it.main;
+      if (it.rest) { const s = document.createElement("small"); s.textContent = it.rest; li.append(s); }
+      li.addEventListener("click", () => choose(i));
+      list.append(li);
+    });
+    active = -1;
+    open();
+  };
+
   const highlight = (i) => {
     active = i;
-    [...list.children].forEach((li, n) => li.setAttribute("aria-selected", String(n === i)));
-    if (i >= 0) {
-      input.setAttribute("aria-activedescendant", list.children[i].id);
-      list.children[i].scrollIntoView({ block: "nearest" });
-    }
+    [...list.querySelectorAll('[role="option"]')].forEach((li, n) => li.setAttribute("aria-selected", String(n === i)));
+    const el = list.children[i];
+    if (el) { input.setAttribute("aria-activedescendant", el.id); el.scrollIntoView({ block: "nearest" }); }
   };
 
   const choose = (i) => {
@@ -104,57 +186,105 @@ function attachAutocomplete(input, route, field, otherField) {
     dirty();
   };
 
-  const search = async (q) => {
+  const askPermission = (then) => status(
+    "Address suggestions use the free OpenStreetMap search and need your permission first.",
+    {
+      label: "Allow",
+      onClick: async () => {
+        const ok = await api.permissions.request({ origins: AC_HOSTS }).catch(() => false);
+        if (ok) then(); else status("Permission wasn't given, so suggestions are off. You can still type a full address.");
+      },
+    }
+  );
+
+  const run = async (q, wide) => {
     ctrl?.abort();
     ctrl = new AbortController();
-    const params = new URLSearchParams({ q, limit: "6" });
-    const bias = route[`${otherField}Coords`];
-    if (bias) { params.set("lat", bias[0]); params.set("lon", bias[1]); }
+    if (!(await hasAcPermission())) { askPermission(() => run(q, wide)); return; }
+    status(wide ? "Searching OpenStreetMap…" : "Searching…");
     try {
-      const resp = await fetch(`https://photon.komoot.io/api/?${params}`, { signal: ctrl.signal });
-      const data = await resp.json();
-      items = (data.features || []).map((f) => {
-        const { main, rest } = labelFor(f.properties || {});
-        const [lon, lat] = f.geometry.coordinates;
-        return { main, rest, text: [main, rest].filter(Boolean).join(", "), coords: [+lat.toFixed(6), +lon.toFixed(6)] };
-      }).filter((x) => x.main);
+      const found = wide
+        ? await nominatimSearch(q, ctrl.signal)
+        : await photonSearch(q, route[`${otherField}Coords`], ctrl.signal);
+      showItems(found, wide
+        ? "No places found. Try adding the town, e.g. \"Via Toledo 1, Napoli\"."
+        : "No matches yet. Keep typing, or press Enter to search more widely.");
     } catch (e) {
       if (e.name === "AbortError") return;
-      items = [];
+      console.warn("Address search failed:", e);
+      status(wide
+        ? `Couldn't reach OpenStreetMap search (${e.message}). You can still type a full address.`
+        : `Suggestions aren't available right now (${e.message}). Press Enter to search OpenStreetMap instead.`);
     }
-    list.textContent = "";
-    items.forEach((it, i) => {
-      const li = document.createElement("li");
-      li.id = `${list.id}-${i}`;
-      li.setAttribute("role", "option");
-      li.textContent = it.main;
-      if (it.rest) { const s = document.createElement("small"); s.textContent = it.rest; li.append(s); }
-      li.addEventListener("mousedown", (ev) => { ev.preventDefault(); choose(i); });
-      list.append(li);
-    });
-    list.hidden = !items.length;
-    input.setAttribute("aria-expanded", String(!!items.length));
-    active = -1;
   };
 
   input.addEventListener("input", () => {
     route[field] = input.value;
-    route[`${field}Coords`] = null; // typed by hand: let Google Maps interpret the text
+    route[`${field}Coords`] = null; // typed by hand: Google Maps will interpret the text
     showPin();
     dirty();
     clearTimeout(timer);
     const q = input.value.trim();
     if (q.length < 3) { close(); return; }
-    timer = setTimeout(() => search(q), 300);
+    timer = setTimeout(() => run(q, false), 300);
   });
   input.addEventListener("keydown", (ev) => {
-    if (list.hidden) return;
-    if (ev.key === "ArrowDown") { ev.preventDefault(); highlight((active + 1) % items.length); }
-    else if (ev.key === "ArrowUp") { ev.preventDefault(); highlight((active - 1 + items.length) % items.length); }
-    else if (ev.key === "Enter" && active >= 0) { ev.preventDefault(); choose(active); }
-    else if (ev.key === "Escape") close();
+    if (ev.key === "ArrowDown" && items.length) { ev.preventDefault(); highlight((active + 1) % items.length); }
+    else if (ev.key === "ArrowUp" && items.length) { ev.preventDefault(); highlight((active - 1 + items.length) % items.length); }
+    else if (ev.key === "Enter") {
+      ev.preventDefault();
+      if (active >= 0) choose(active);
+      else if (input.value.trim().length >= 3) { clearTimeout(timer); run(input.value.trim(), true); }
+    } else if (ev.key === "Escape") close();
   });
-  input.addEventListener("blur", () => setTimeout(close, 100));
+  input.addEventListener("blur", () => setTimeout(close, 150));
+
+  locate.addEventListener("click", async () => {
+    // Ask for the address-lookup permission first, while the click still counts (Firefox).
+    const canLookup = api.permissions.request({ origins: AC_HOSTS }).catch(() => false);
+    if (!navigator.geolocation) { status("This browser can't share your location. Type the address instead."); return; }
+    locate.disabled = true;
+    status("Finding your location…");
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }));
+      const lat = +pos.coords.latitude.toFixed(6);
+      const lon = +pos.coords.longitude.toFixed(6);
+      let text = `My location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+      if (await canLookup) {
+        try {
+          const resp = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`);
+          const p = resp.ok ? (await resp.json()).features?.[0]?.properties : null;
+          if (p) {
+            const { main, rest } = labelFor(p);
+            if (main) text = [main, rest].filter(Boolean).join(", ");
+          }
+        } catch { /* keep the coordinates label */ }
+      }
+      route[field] = text;
+      route[`${field}Coords`] = [lat, lon];
+      input.value = text;
+      showPin();
+      dirty();
+      const acc = Math.round(pos.coords.accuracy || 0);
+      if (acc > 300) {
+        const shown = acc >= 1000 ? `${(acc / 1000).toFixed(1)} km` : `${acc} m`;
+        status(`Location set, but it's only accurate to about ${shown}. Check the address, or type it instead.`);
+        setTimeout(close, 8000);
+      } else {
+        close();
+      }
+    } catch (e) {
+      const msg = e.code === 1
+        ? "Location access is blocked for this extension. Allow it in your browser settings, or type the address."
+        : e.code === 3
+          ? "Finding your location took too long. Try again, or type the address."
+          : "Your computer couldn't find its location. On Windows, check Settings > Privacy & security > Location is on.";
+      status(msg);
+    } finally {
+      locate.disabled = false;
+    }
+  });
 }
 
 // ---------- route card ----------
@@ -276,6 +406,11 @@ async function save() {
   return true;
 }
 
+$("ver").textContent = `version ${api.runtime.getManifest().version}`;
+$("testNotify").onclick = async () => {
+  const resp = await api.runtime.sendMessage({ type: "testNotification" });
+  $("notifyOut").textContent = resp?.ok ? "Sent. It should appear in the corner of your screen." : "Couldn't send it.";
+};
 $("add").onclick = () => { routes.push(newRoute({ name: "New route" })); render(); };
 $("save").onclick = save;
 load();

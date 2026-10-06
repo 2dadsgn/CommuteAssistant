@@ -2,6 +2,9 @@ const api = globalThis.browser ?? globalThis.chrome;
 const list = document.getElementById("list");
 const MIN = 60000;
 
+// Lets the background know the popup is open (it notifies instead if the popup closes).
+api.runtime.connect({ name: "popup" });
+
 document.getElementById("settings").onclick = () => api.runtime.openOptionsPage();
 
 const fmt = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
